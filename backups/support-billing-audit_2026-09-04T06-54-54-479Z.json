@@ -1,0 +1,1837 @@
+{
+  "mode": "report",
+  "findings": [
+    {
+      "customer": "中屋 三鈴 <misuzu3601inoue@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TeJ7jsPdsmfJSf=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TeJ7jsPdsmfJSf",
+        "cus_TeJ50UoIoaLb8z"
+      ]
+    },
+    {
+      "customer": "奈保子 雲井 <n.k.7070@softbank.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TLbKRNTxqPi3GK=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TLbKRNTxqPi3GK",
+        "cus_StUO5k5pbQaEnI"
+      ]
+    },
+    {
+      "customer": "千葉 里美 <arkr1010@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TiaaVchwxtd9pl=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TiaaVchwxtd9pl",
+        "cus_TiPyDarrmMRfp7"
+      ]
+    },
+    {
+      "customer": "さくさき <htntxpnm@i.softbank.jp>",
+      "kind": "DUP",
+      "detail": "馬「52：サチ（大阪）」に生きた支援行が2件（1口/active + 1口/active）",
+      "ids": [
+        "8a1d17e4-9cde-4832-af60-0f7a070de287",
+        "08be9866-6c6d-48e6-a163-cc906ae51a5b"
+      ]
+    },
+    {
+      "customer": "さくさき <htntxpnm@i.softbank.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Tw6HspxHNLJZjw=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_Tw6HspxHNLJZjw",
+        "cus_TL2lQ2Ay149nSR"
+      ]
+    },
+    {
+      "customer": "奥村富美子 <smilepete1957@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SvhOKkjOkXSBj3=¥12,000/月 × 1本, cus_SLWftnmTKwUdJK=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SvhOKkjOkXSBj3",
+        "cus_SLWftnmTKwUdJK",
+        "cus_JjykxvvA2zPXfy"
+      ]
+    },
+    {
+      "customer": "陰山洋子 <yoko@namc.co.jp>",
+      "kind": "MULTISUB",
+      "detail": "生きた支援サブスクリプションが2本あります → sub_1TpWPuI78wDNWYHlRQzW3lLE=¥12,000/月 (active), sub_1TnVJGI78wDNWYHlG2j4FK6T=¥12,000/月 (active)",
+      "subscriptionIds": [
+        "sub_1TpWPuI78wDNWYHlRQzW3lLE",
+        "sub_1TnVJGI78wDNWYHlG2j4FK6T"
+      ]
+    },
+    {
+      "customer": "陰山洋子 <yoko@namc.co.jp>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_Uf8vCiop28H4R7)でも課金中、さらに管理外の顧客でも課金継続 → cus_UHoWLs73pHZSaU=¥3,000/月 × 1本, cus_UDNP3MmWiaHDBi=¥24,000/月 × 1本, cus_UDKJIBewaJ4M21=¥12,000/月 × 1本",
+      "linked": "cus_Uf8vCiop28H4R7",
+      "shadow": [
+        "cus_UK18W9t7VuJ7Jn",
+        "cus_UHoWLs73pHZSaU",
+        "cus_UDNP3MmWiaHDBi",
+        "cus_UDKJIBewaJ4M21"
+      ]
+    },
+    {
+      "customer": "陰山洋子 <yoko@namc.co.jp>",
+      "kind": "ORPHAN",
+      "detail": "Stripe に支援 item が残っています (si_Un5UuJvqfsDzAw, ¥12,000/月, sub=sub_1TnVJGI78wDNWYHlG2j4FK6T) が、対応する支援行がありません",
+      "itemId": "si_Un5UuJvqfsDzAw",
+      "subscriptionId": "sub_1TnVJGI78wDNWYHlG2j4FK6T",
+      "isLastItem": true
+    },
+    {
+      "customer": "吉田　絵理加 <e.yoshida.3290gm@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UHmK0I4sIruqLz=¥3,000/月 × 1本, cus_TVMkkzhFzrpOj1=¥36,000/月 × 1本, cus_TJpFk4r96PxTsy=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UHmK0I4sIruqLz",
+        "cus_TVMkkzhFzrpOj1",
+        "cus_TJpFk4r96PxTsy",
+        "cus_TJp53BKavTJHHF",
+        "cus_TJoNyfPJesBhZy",
+        "cus_TIKWTXZG27RjVQ",
+        "cus_TIKPzTbZw54MyN",
+        "cus_StG3NTl8BjpRe5",
+        "cus_SsrblrnvvZV3My",
+        "cus_SLNO1abdzxh05m",
+        "cus_SIAMdqDtoTcU4F"
+      ]
+    },
+    {
+      "customer": "原口佳子 <k.haraguchi@ohkamigawaon.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U2DdOP6AMTcvT6=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U2DdOP6AMTcvT6"
+      ]
+    },
+    {
+      "customer": "川満明美 <sirikuro@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SvrRE7C2oXhWa4=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SvrRE7C2oXhWa4"
+      ]
+    },
+    {
+      "customer": "ゴメユニ子 <yuritamaaitama@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TLA3O7iwwmmtAa=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TLA3O7iwwmmtAa",
+        "cus_Sy6hKingSdh4Wo"
+      ]
+    },
+    {
+      "customer": "下口 浩子 <berniehks@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SLnI6ZcvgVVRIP=¥1,000/月 × 1本, cus_SGb99aAnJzZHzi=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UERdWbER89jNV4",
+        "cus_SLnI6ZcvgVVRIP",
+        "cus_SGb99aAnJzZHzi",
+        "cus_S8HqvBdfk3Z9oU"
+      ]
+    },
+    {
+      "customer": "岡田千佳 <agreable@au.wakwak.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TisoXugjCESH3t=¥6,000/月 × 1本, cus_TelnqWN4HxjF60=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TisoXugjCESH3t",
+        "cus_TelnqWN4HxjF60"
+      ]
+    },
+    {
+      "customer": "蒲 百合子 <yuriko3300@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TenUic0hv5Rflz=¥6,000/月 × 1本, cus_SU5myH9HDUQnC7=¥1,800/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TenUic0hv5Rflz",
+        "cus_SU5myH9HDUQnC7"
+      ]
+    },
+    {
+      "customer": "zero <gackt1110yamk@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UDnb6GqZsWYjEt=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UDnb6GqZsWYjEt"
+      ]
+    },
+    {
+      "customer": "村上祐子 <y6139011354@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TkG2MOHVxbt8M8=¥6,000/月 × 1本, cus_SLW0jlNnzaajFP=¥1,000/月 × 1本, cus_RwORbHR3z2DC8f=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TkG2MOHVxbt8M8",
+        "cus_SLW0jlNnzaajFP",
+        "cus_RwORbHR3z2DC8f",
+        "cus_QUWi98WwyTJtd2"
+      ]
+    },
+    {
+      "customer": "岩崎純子 <mitsubachi666.polishmania@ezweb.ne.jp>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_V4AwIGaydZ1lXB)でも課金中、さらに管理外の顧客でも課金継続 → cus_UAU6AFKJMgF1PW=¥12,000/月 × 1本, cus_TRNfdYaAQmZxQ2=¥12,000/月 × 1本, cus_TOGa9VWF0RpcfY=¥12,000/月 × 1本, cus_SvOFKi8mYV1EL3=¥12,000/月 × 1本",
+      "linked": "cus_V4AwIGaydZ1lXB",
+      "shadow": [
+        "cus_UAU6AFKJMgF1PW",
+        "cus_TRNfdYaAQmZxQ2",
+        "cus_TOGa9VWF0RpcfY",
+        "cus_SvOFKi8mYV1EL3"
+      ]
+    },
+    {
+      "customer": "芝崎 麻里子 <chaiqim@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UF7sXeJzjZVAAR=¥12,000/月 × 1本, cus_UEHKxEzGSCcyBt=¥24,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UF7sXeJzjZVAAR",
+        "cus_UEHKxEzGSCcyBt"
+      ]
+    },
+    {
+      "customer": "岩瀬任子 <takabei39bekkanko@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SH1o7BNiJzvzIa=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_Seuu4jmsUmujtL",
+        "cus_SH1o7BNiJzvzIa",
+        "cus_QwXjZ5aY0AQn2b"
+      ]
+    },
+    {
+      "customer": "モンタグ俊江 <tosmontag@pm.me>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_ULGmZ7ppw9Ej22=¥12,000/月 × 1本, cus_UI0NI2fcEg5uWy=¥3,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_ULGmZ7ppw9Ej22",
+        "cus_UKxszkqyr0tBWy",
+        "cus_UKxgnZTAKnplBm",
+        "cus_UI0NI2fcEg5uWy",
+        "cus_UF8dgS65FZBZX9",
+        "cus_UENWuCXJZwkYnQ",
+        "cus_UEN7mbNBLCM2g5"
+      ]
+    },
+    {
+      "customer": "花岡 嘉奈子 <hanaoka.kanako@gmail.com>",
+      "kind": "DUP",
+      "detail": "馬「22：ココロ（千葉：八街）」に生きた支援行が3件（1口/active + 1口/active + 1口/active）",
+      "ids": [
+        "e74402f5-2e66-47b1-9d2b-8acc2be0cee7",
+        "6b540313-3db2-42d2-a802-c82450df30d6",
+        "2638c730-622b-4bd8-ab78-e1c5ab144ec3"
+      ]
+    },
+    {
+      "customer": "花岡 嘉奈子 <hanaoka.kanako@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SOLF1ouocB4n1J=¥36,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SOLF1ouocB4n1J",
+        "cus_QxBB8DLqUaaFEL"
+      ]
+    },
+    {
+      "customer": "桑野 菊美 <kanna.farm8@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SerXfcC0bTlXzk=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SerXfcC0bTlXzk"
+      ]
+    },
+    {
+      "customer": "桂 知輝 <guizhihui3@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SkGBgduOVESj8k=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SkIPydsz2UJZAS",
+        "cus_SkIOXKYp1t2us0",
+        "cus_SkGBgduOVESj8k"
+      ]
+    },
+    {
+      "customer": "原明子 <aki-hara@rc4.so-net.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TPQXWwTgmSR8M3=¥6,000/月 × 1本, cus_TOJRdEh23opINV=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TPQXWwTgmSR8M3",
+        "cus_TOJRdEh23opINV"
+      ]
+    },
+    {
+      "customer": "古屋 雅子 <fwkb6849@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SxP26VbBXQyxuc=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SxP26VbBXQyxuc",
+        "cus_SrWsAUWrY9ufDX"
+      ]
+    },
+    {
+      "customer": "古賀　雅美 <masami.dolly727@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Tdi0rPqFdrQpqb=¥6,000/月 × 1本, cus_TdY6McAmTfDFoe=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_Tdi0rPqFdrQpqb",
+        "cus_TdY6McAmTfDFoe",
+        "cus_TOwJTQFNI1prD6",
+        "cus_TAtK2j1KxBJ3Zw"
+      ]
+    },
+    {
+      "customer": "かなちゃん <t.k42714k.k@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TezFcqzmvef0ag=¥6,000/月 × 1本, cus_TLBnMUZGVInZ7V=¥6,000/月 × 1本（DB紐付けは cus_Uj7d1SZQHPS60B）",
+      "linked": "cus_Uj7d1SZQHPS60B",
+      "shadow": [
+        "cus_TezFcqzmvef0ag",
+        "cus_TLBnMUZGVInZ7V",
+        "cus_TCt7e9Mn9B55fr"
+      ]
+    },
+    {
+      "customer": "原口 英子 <ilove365momo@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEO7Dvbo6dp1R5=¥6,000/月 × 1本, cus_UDcUDBQMWP2rL2=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEO7Dvbo6dp1R5",
+        "cus_UDcUDBQMWP2rL2"
+      ]
+    },
+    {
+      "customer": "ゆみぃ <yumii.miya87@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TcoLVcum27n7hj=¥6,000/月 × 1本（DB紐付けは cus_UrwtEgu2cvxmSi）",
+      "linked": "cus_UrwtEgu2cvxmSi",
+      "shadow": [
+        "cus_TcoLVcum27n7hj"
+      ]
+    },
+    {
+      "customer": "吉川 美知 <mjdf0615@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UHvVcP51IgSFOJ=¥12,000/月 × 1本, cus_UHvSgsCL3lWQjh=¥3,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UHvVcP51IgSFOJ",
+        "cus_UHvSgsCL3lWQjh",
+        "cus_TdTmC2wD3KSOHb",
+        "cus_Ta7HNY50id8hIx"
+      ]
+    },
+    {
+      "customer": "くるくる <kurukururin0327@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SC5mk4hz1H0kFU=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SC5mk4hz1H0kFU"
+      ]
+    },
+    {
+      "customer": "後藤 暢子 <pocoyama20111112@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TOgrwVtKuNtFLA=¥6,000/月 × 1本, cus_SQNkCImYKBZSZS=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TOgrwVtKuNtFLA",
+        "cus_SQNkCImYKBZSZS"
+      ]
+    },
+    {
+      "customer": "高成田 奈穂 <naorelax46@gmail.com>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_UnG5ulQzk1DzVL)でも課金中、さらに管理外の顧客でも課金継続 → cus_SQ1wumDbbxrOgL=¥12,000/月 × 1本",
+      "linked": "cus_UnG5ulQzk1DzVL",
+      "shadow": [
+        "cus_SQ1wumDbbxrOgL"
+      ]
+    },
+    {
+      "customer": "黒岩 真理子 <yunatsumama0110@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TPfLnfuyZGLsGw=¥6,000/月 × 1本, cus_SL3wuUcPsZsiVu=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TPfLnfuyZGLsGw",
+        "cus_SL3wuUcPsZsiVu"
+      ]
+    },
+    {
+      "customer": "高橋 和司 <0br18742725472g@ezweb.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Sfe1Gang2FcHzZ=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_Sfe1Gang2FcHzZ",
+        "cus_SXskBqErngxOn1"
+      ]
+    },
+    {
+      "customer": "高橋智香 <tomoka.kyt.4wt22@ezweb.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UKEyFSZEJFgXFx=¥3,000/月 × 1本, cus_TOcSMXjmqNujyq=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UKEyFSZEJFgXFx",
+        "cus_TOcSMXjmqNujyq"
+      ]
+    },
+    {
+      "customer": "古川奈南 <asamack-niconico.0123@softbank.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TcvvFCUzTpqmnz=¥12,000/月 × 1本（DB紐付けは cus_UkFIVmFGKMsQGP）",
+      "linked": "cus_UkFIVmFGKMsQGP",
+      "shadow": [
+        "cus_TcvvFCUzTpqmnz",
+        "cus_TcYhK9oG8SbnH0"
+      ]
+    },
+    {
+      "customer": "荒生 盛子 <seiko.a96@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SZCGpJgoOqvU2K=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SZCGpJgoOqvU2K",
+        "cus_SZ31Kp9NZXL3fg"
+      ]
+    },
+    {
+      "customer": "溝口智子 <tomoko683467@docomo.ne.jp>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_V70tAsu2QK5yfW)でも課金中、さらに管理外の顧客でも課金継続 → cus_UHmCMlydBlw50Y=¥3,000/月 × 1本, cus_SPW4ijA6eq1Rgx=¥24,000/月 × 1本",
+      "linked": "cus_V70tAsu2QK5yfW",
+      "shadow": [
+        "cus_UHmCMlydBlw50Y",
+        "cus_Tcn4oQuTdIXmUZ",
+        "cus_SXMCJSyqQ6HFcd",
+        "cus_SPW4ijA6eq1Rgx",
+        "cus_SLh58vB1Ij5251"
+      ]
+    },
+    {
+      "customer": "溝口智子 <tomoko683467@docomo.ne.jp>",
+      "kind": "ORPHAN",
+      "detail": "Stripe に支援 item が残っています (si_VCDGLi3Z11JkQr, ¥6,000/月, sub=sub_1UBon9I78wDNWYHlYZLBfgaL) が、対応する支援行がありません",
+      "itemId": "si_VCDGLi3Z11JkQr",
+      "subscriptionId": "sub_1UBon9I78wDNWYHlYZLBfgaL",
+      "isLastItem": false
+    },
+    {
+      "customer": "溝口智子 <tomoko683467@docomo.ne.jp>",
+      "kind": "ORPHAN",
+      "detail": "Stripe に支援 item が残っています (si_VCDHwKY0rcrVQq, ¥6,000/月, sub=sub_1UBon9I78wDNWYHlYZLBfgaL) が、対応する支援行がありません",
+      "itemId": "si_VCDHwKY0rcrVQq",
+      "subscriptionId": "sub_1UBon9I78wDNWYHlYZLBfgaL",
+      "isLastItem": false
+    },
+    {
+      "customer": "高山　真理子 <dennami-mama@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TcXXR6LTnorwVJ=¥6,000/月 × 1本, cus_T4kL9NbpEUEAYw=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TcXXR6LTnorwVJ",
+        "cus_T4kL9NbpEUEAYw"
+      ]
+    },
+    {
+      "customer": "高坂 暁子 <snwgby@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SXhHlIg2YEJvoq=¥12,000/月 × 1本, cus_SQEOCGGYDbOuBv=¥12,000/月 × 1本, cus_SLiXmJrqLtbh5f=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SXhHlIg2YEJvoq",
+        "cus_SQEOCGGYDbOuBv",
+        "cus_SLiXmJrqLtbh5f",
+        "cus_RTpIyBmc91tZ3z"
+      ]
+    },
+    {
+      "customer": "松丸 沙樹 <yurayura.xxx926@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U3qKFImTwsEoNt=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U3qKFImTwsEoNt",
+        "cus_TOgmaCIK4vscb8",
+        "cus_STM6YFf73IMbrz"
+      ]
+    },
+    {
+      "customer": "高井聖渚 <seina@andbold.co.jp>",
+      "kind": "DUP",
+      "detail": "馬「13：メメ（千葉：山武）」に生きた支援行が3件（1口/active + 1口/active + 1口/active）",
+      "ids": [
+        "d3ff4889-6054-4165-9707-c679b2dc7673",
+        "1a547c3f-7475-4558-984c-1f560afc8c2e",
+        "ef75c77f-ebb7-42ba-b39d-810ed4e3db37"
+      ]
+    },
+    {
+      "customer": "高井聖渚 <seina@andbold.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UDgnHDSjKFhPGL=¥36,000/月 × 1本（DB紐付けは cus_V6IrW2qdXUOBlT）",
+      "linked": "cus_V6IrW2qdXUOBlT",
+      "shadow": [
+        "cus_UDgnHDSjKFhPGL"
+      ]
+    },
+    {
+      "customer": "米田　恵 <keikei3133@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TkkWQzrataAwo8=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TkkWQzrataAwo8",
+        "cus_TUD1QBGpjUEun0",
+        "cus_JpiXpoeB4pShxZ"
+      ]
+    },
+    {
+      "customer": "坂本 由香 <winnie9the21pooh@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Thnirrp93uLQqO=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_Thnirrp93uLQqO"
+      ]
+    },
+    {
+      "customer": "山口 なおみ <hanasama0901@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TSHYz6nRRxgcrf=¥6,000/月 × 1本, cus_SlybEudAHoZl7u=¥12,000/月 × 1本, cus_SLtqJwJoYB4DaY=¥12,000/月 × 1本, cus_SLVSvVN6Drujqx=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TSHYz6nRRxgcrf",
+        "cus_SlybEudAHoZl7u",
+        "cus_SNEyW14WYCExdr",
+        "cus_SLtqJwJoYB4DaY",
+        "cus_SLVSvVN6Drujqx",
+        "cus_RdJUMJ4zvJMrPe",
+        "cus_QsuCs6PNsFP79j"
+      ]
+    },
+    {
+      "customer": "山口結未 <y.yume1215@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TbS235PHU3TLLg=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TbS235PHU3TLLg"
+      ]
+    },
+    {
+      "customer": "山外照美 <imuret0208@ezweb.ne.jp>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_Um24EEelqZjYGH)でも課金中、さらに管理外の顧客でも課金継続 → cus_UGciZGciSOQOrI=¥6,000/月 × 1本, cus_TkPp567Q5phHAy=¥6,000/月 × 1本",
+      "linked": "cus_Um24EEelqZjYGH",
+      "shadow": [
+        "cus_UGciZGciSOQOrI",
+        "cus_TkPp567Q5phHAy",
+        "cus_TQVdQVai2Zbss1",
+        "cus_T00GfPIyyyk5iW"
+      ]
+    },
+    {
+      "customer": "秋田 愛美 <nananamihey@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SvWuiu9ThyXXC4=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SvWuiu9ThyXXC4",
+        "cus_Qg9M3kVHcj32FB"
+      ]
+    },
+    {
+      "customer": "菅原 恵美子 <juliet_endless-love_romeo@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SmXSkt3v0jSD6n=¥12,000/月 × 1本, cus_SLXbFq4aYZq39o=¥1,000/月 × 1本, cus_SG7XX0Da1qNyOL=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SmXSkt3v0jSD6n",
+        "cus_SLXbFq4aYZq39o",
+        "cus_SG7XX0Da1qNyOL",
+        "cus_S2wR8sSxLzz1Rd",
+        "cus_RgvJvU7lwLfZ0t"
+      ]
+    },
+    {
+      "customer": "若狹健二 <takekennp@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TfQ3t3fhGJgCNC=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TfQ3t3fhGJgCNC",
+        "cus_TeOA57IfwrY8BH",
+        "cus_TdAfc708EgrWSB"
+      ]
+    },
+    {
+      "customer": "柴田信子 <noko-bikke@i.softbank.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SvLihamdcjw96E=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_T4ozS0emo21YTV",
+        "cus_SvLihamdcjw96E"
+      ]
+    },
+    {
+      "customer": "吉田 久二子 <lalala_274@yahoo.co.jp>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_UnH0n1JwwtMWiN)でも課金中、さらに管理外の顧客でも課金継続 → cus_UEeEQmjCvcfPfx=¥12,000/月 × 1本",
+      "linked": "cus_UnH0n1JwwtMWiN",
+      "shadow": [
+        "cus_UEeH3NzWEnLQxI",
+        "cus_UEeEQmjCvcfPfx"
+      ]
+    },
+    {
+      "customer": "山岸 一美 <kazumi0401y@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SvGMP2fsJBJKP0=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SvGMP2fsJBJKP0",
+        "cus_SvGJl3FfBx2yU0"
+      ]
+    },
+    {
+      "customer": "小田桐 都 <ogiri.0706@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TeFsjjU4SwRWHE=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TeFsjjU4SwRWHE"
+      ]
+    },
+    {
+      "customer": "小田百合子 <yumbo55@aol.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SLOGBDJskT1yF5=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SLOGBDJskT1yF5",
+        "cus_QZlbyPQ7i2hLVN",
+        "cus_MUPst5kIEr3O3P"
+      ]
+    },
+    {
+      "customer": "道恵 市川 <michie2fiona@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TrBSwezgOAzpnx=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TrBSwezgOAzpnx",
+        "cus_TTShhQIp9ttVhG",
+        "cus_RZF0a3EKBVdHnv"
+      ]
+    },
+    {
+      "customer": "小川 弘子 <hi-ro-ko.0901@nifty.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UU9JTfJOZTVwWk=¥6,000/月 × 1本, cus_UU9FH9YX5b1VsJ=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UU9Nw7jIS6OQlp",
+        "cus_UU9LoN9ROIM0dg",
+        "cus_UU9JTfJOZTVwWk",
+        "cus_UU9FH9YX5b1VsJ",
+        "cus_SzAyNqXg2K6HqU",
+        "cus_StPoiZhch8xBPQ",
+        "cus_SGGKSMUCfmvIOy"
+      ]
+    },
+    {
+      "customer": "山下 奈光 <nanami.mario_colon.love@softbank.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_StJgrUrqZFlXMX=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_StJgrUrqZFlXMX"
+      ]
+    },
+    {
+      "customer": "重村久美 <kumi92117@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TOJmLTbv9vtuBE=¥6,000/月 × 1本, cus_TOJfM9Mju3Dfv3=¥6,000/月 × 1本, cus_TOJbkGNOq43nzI=¥6,000/月 × 1本, cus_TOIKQF7eaqtAHF=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TOJmLTbv9vtuBE",
+        "cus_TOJfM9Mju3Dfv3",
+        "cus_TOJbkGNOq43nzI",
+        "cus_TOIKQF7eaqtAHF"
+      ]
+    },
+    {
+      "customer": "小原朱美 <cha_ko-akemi@au.com>",
+      "kind": "DUP",
+      "detail": "馬「36：イメル（千葉：八街）」に生きた支援行が2件（1口/active + 0.5口/active）",
+      "ids": [
+        "1c968e26-1da2-4e0a-9960-dd0ee411939f",
+        "eea55cc4-3831-490c-9e5a-a3b7bbb86936"
+      ]
+    },
+    {
+      "customer": "小原朱美 <cha_ko-akemi@au.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_US7bqrr5nRUGtC=¥3,000/月 × 1本, cus_TLBjz0BAEbE7qi=¥6,000/月 × 1本, cus_TJ0A3TIrAcKP6J=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_US7bqrr5nRUGtC",
+        "cus_TLBjz0BAEbE7qi",
+        "cus_TJ0A3TIrAcKP6J",
+        "cus_SPDe3s8vwUb4fC",
+        "cus_KjNBA2wtuzt9RU"
+      ]
+    },
+    {
+      "customer": "小山久子 <chocolate.it_is_like_a_life@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_T67muEOSnNbcxi=¥12,000/月 × 1本, cus_Sjs75H5VnLh5Jj=¥36,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_T67muEOSnNbcxi",
+        "cus_SvIOCWzen5XTvB",
+        "cus_Sjs75H5VnLh5Jj",
+        "cus_Sjs4MNdvghfAMM",
+        "cus_SGYA7ryx3L94KO",
+        "cus_SGXyGJLVLJ5smW",
+        "cus_SAZu86GaBqMBdx"
+      ]
+    },
+    {
+      "customer": "Mai <mai.yamamoto.hk@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U0oAl3tOrJ2G8E=¥6,000/月 × 1本, cus_TIKG8NWhRhIFBJ=¥12,000/月 × 1本, cus_Sd8IOB7L2q3qGZ=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U0oAl3tOrJ2G8E",
+        "cus_TIKG8NWhRhIFBJ",
+        "cus_Sd8IOB7L2q3qGZ"
+      ]
+    },
+    {
+      "customer": "小坂清美 <poo-mama-usagi@t.vodafone.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_StNMMzDUHFABr0=¥12,000/月 × 1本, cus_SfkZkVi5vFCRsC=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_StNMMzDUHFABr0",
+        "cus_SfkZkVi5vFCRsC"
+      ]
+    },
+    {
+      "customer": "小林ひふみ <mtg300727@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UMfyOdj09qa68U=¥1,000/月 × 1本, cus_UJpQ9f6JwNheDF=¥6,000/月 × 1本（DB紐付けは cus_UfLhqSX3r1ZK63）",
+      "linked": "cus_UfLhqSX3r1ZK63",
+      "shadow": [
+        "cus_UMfyOdj09qa68U",
+        "cus_UJpQ9f6JwNheDF",
+        "cus_U1avjKE7cNffYE",
+        "cus_U15ZUnHC4RfHyB",
+        "cus_SHyRfn7O9gd5qw"
+      ]
+    },
+    {
+      "customer": "杉浦 知子 <orange06chocolate@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TdwKaPSsFuF26m=¥12,000/月 × 1本, cus_Tdw8wUwinv9BHB=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TdwKaPSsFuF26m",
+        "cus_Tdw8wUwinv9BHB",
+        "cus_Tdw2LA7SJoJ6Vf",
+        "cus_TOj5pChEyziFUN",
+        "cus_TOiwa9ouANmMem",
+        "cus_THa191u8EG29z7",
+        "cus_THQKJSYTK2eTlp"
+      ]
+    },
+    {
+      "customer": "mirainosekai.0304@gmail.com <mirainosekai.0304@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TP5wuy0xFSSgLA=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TP5wuy0xFSSgLA"
+      ]
+    },
+    {
+      "customer": "松塚 貴美子 <kmkm0814@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U1hJK5XiwN0QMv=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U1hJK5XiwN0QMv",
+        "cus_U1guR3eEGUmduj"
+      ]
+    },
+    {
+      "customer": "大谷綾子 <ayamoon84@hotmail.com>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_Uq4o2lKgpEotUc)でも課金中、さらに管理外の顧客でも課金継続 → cus_SGqiWOtIxOmqNP=¥12,000/月 × 1本",
+      "linked": "cus_Uq4o2lKgpEotUc",
+      "shadow": [
+        "cus_TPPM5XlnRmj0pg",
+        "cus_SGqiWOtIxOmqNP",
+        "cus_S8mwIAbncXBufi"
+      ]
+    },
+    {
+      "customer": "小林 美紀 <narimamahiro@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Tkp1xeBmgOBPW0=¥24,000/月 × 1本, cus_Rrl7Zcx2AXFMAe=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_Tkp1xeBmgOBPW0",
+        "cus_Rrl7Zcx2AXFMAe"
+      ]
+    },
+    {
+      "customer": "森田 起美枝 <maonokanikama618@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UDdnPOMT60iEsU=¥6,000/月 × 1本, cus_SYzHcrs58kaA5C=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UDdnPOMT60iEsU",
+        "cus_SYzHcrs58kaA5C"
+      ]
+    },
+    {
+      "customer": "野村 晴代 <kouta1999@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UI1HQVfAhoYeKT=¥3,000/月 × 1本, cus_Tfp2xcc1KtMl0X=¥6,000/月 × 1本, cus_SLWmQoqnYTeHy8=¥1,000/月 × 1本（DB紐付けは cus_Uj9Qeocvu966YG）",
+      "linked": "cus_Uj9Qeocvu966YG",
+      "shadow": [
+        "cus_UI1HQVfAhoYeKT",
+        "cus_Tfp2xcc1KtMl0X",
+        "cus_SLWmQoqnYTeHy8"
+      ]
+    },
+    {
+      "customer": "むむ さん <pikamemema@gmail.com>",
+      "kind": "MULTISUB",
+      "detail": "生きた支援サブスクリプションが3本あります → sub_1ThrqbI78wDNWYHl4MwyvTMW=¥12,000/月 (active), sub_1ThNyCI78wDNWYHlbq3IogAr=¥12,000/月 (active), sub_1ThNwzI78wDNWYHlEbMeSU9x=¥12,000/月 (active)",
+      "subscriptionIds": [
+        "sub_1ThrqbI78wDNWYHl4MwyvTMW",
+        "sub_1ThNyCI78wDNWYHlbq3IogAr",
+        "sub_1ThNwzI78wDNWYHlEbMeSU9x"
+      ]
+    },
+    {
+      "customer": "むむ さん <pikamemema@gmail.com>",
+      "kind": "PRICE",
+      "detail": "「17：ユメ（千葉：山武）」の Stripe 単価が ¥12,000（期待値 ¥6,000）— 数量計算が成立しません",
+      "supportId": "75001be3-447a-47cd-9689-416b80e3a118",
+      "itemId": "si_UglTfXjqMNHyum"
+    },
+    {
+      "customer": "むむ さん <pikamemema@gmail.com>",
+      "kind": "PRICE",
+      "detail": "「38：ホープ（千葉：山武）」の Stripe 単価が ¥12,000（期待値 ¥6,000）— 数量計算が成立しません",
+      "supportId": "5e65078c-aa26-465c-ab56-13ba8126c39f",
+      "itemId": "si_UglVkz7AkOtNjQ"
+    },
+    {
+      "customer": "青山　伊づ美 <i23.mtblue@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_ToZayL7eyCDsGi=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_ToZayL7eyCDsGi",
+        "cus_TfKc1ludwJuBQZ"
+      ]
+    },
+    {
+      "customer": "西村　道子 <bqjpx023@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SNhPN5YCfdWR1R=¥12,000/月 × 1本, cus_SLVz7nkwKkIQpW=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SNhPN5YCfdWR1R",
+        "cus_SLVz7nkwKkIQpW",
+        "cus_JkKmN0HmygK8m6"
+      ]
+    },
+    {
+      "customer": "菅田　珠字 <tamawayoga@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UK5bAZGLx535xM=¥3,000/月 × 1本, cus_TUWV7S0yUznny8=¥6,000/月 × 1本, cus_ScYjKhivFp0uDk=¥12,000/月 × 1本, cus_SLjFVoHm8D8EJ4=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UK5bAZGLx535xM",
+        "cus_TUWV7S0yUznny8",
+        "cus_ScYjKhivFp0uDk",
+        "cus_SLjFVoHm8D8EJ4",
+        "cus_RNWUM77clTk5GS"
+      ]
+    },
+    {
+      "customer": "前波 久子 <chamopoo@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_T4nj4ovWN6Z5rz=¥12,000/月 × 1本, cus_Sf20PlDWB92ot2=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_T4oic6vo1Gq4U1",
+        "cus_T4nj4ovWN6Z5rz",
+        "cus_Sf277qPhLfgqBE",
+        "cus_Sf20PlDWB92ot2",
+        "cus_SX8z9TAqDDuy29"
+      ]
+    },
+    {
+      "customer": "安藤 史子 <tantonekomanma0324@gmail.com>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_UnQZko6JwAWKZs)でも課金中、さらに管理外の顧客でも課金継続 → cus_UEK11P6OvlyuB8=¥6,000/月 × 1本",
+      "linked": "cus_UnQZko6JwAWKZs",
+      "shadow": [
+        "cus_UEK11P6OvlyuB8"
+      ]
+    },
+    {
+      "customer": "石関 由起子 <jump-kumirin-9393@i.softbank.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEPvF9xQroZ6eW=¥12,000/月 × 1本, cus_SknHcoMKpDXehP=¥1,800/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEPvF9xQroZ6eW",
+        "cus_SknHcoMKpDXehP"
+      ]
+    },
+    {
+      "customer": "ジョイママ <41325belmont@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TPGjvZDaJHMyAI=¥6,000/月 × 1本, cus_SKnX264b4oh906=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TPGjvZDaJHMyAI",
+        "cus_SKnX264b4oh906"
+      ]
+    },
+    {
+      "customer": "増田千奈津 <chinak-message@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TLIYrRXTWw4hw3=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TLIYrRXTWw4hw3",
+        "cus_SYFIEAl8Ta47hW"
+      ]
+    },
+    {
+      "customer": "岸野 育子 <girasoldejulio27@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TllPTMELtkbbcz=¥6,000/月 × 1本（DB紐付けは cus_UoJsqCKnL3IL7d）",
+      "linked": "cus_UoJsqCKnL3IL7d",
+      "shadow": [
+        "cus_TllPTMELtkbbcz",
+        "cus_TPGlbf3ctVUcyN",
+        "cus_SBQ3vdPk9Ok7y6"
+      ]
+    },
+    {
+      "customer": "石田　由美子 <yumisara0523@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TLIgoDpZCtLNjs=¥6,000/月 × 1本（DB紐付けは cus_Uymuex5YRNR42E）",
+      "linked": "cus_Uymuex5YRNR42E",
+      "shadow": [
+        "cus_TLIgoDpZCtLNjs",
+        "cus_T7TISGF6bmV0Im",
+        "cus_ShCUm5nfFMF5WW"
+      ]
+    },
+    {
+      "customer": "石橋 俊子 <4004masha@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEbUsD5Usy3jCS=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEbUsD5Usy3jCS"
+      ]
+    },
+    {
+      "customer": "前田 充代 <himmcyoi18@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SlaF44Yv9I5jMT=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SlaF44Yv9I5jMT",
+        "cus_SepXEjaayKO8qO",
+        "cus_SeeXKoidyO63yt"
+      ]
+    },
+    {
+      "customer": "石田　康子 <shizuhibi@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SffRmrztaMHE9i=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SffRmrztaMHE9i",
+        "cus_S7TJ222l3zhOOq"
+      ]
+    },
+    {
+      "customer": "石津愛子 <evo-aiko@ezweb.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_StFpU3CZCLWK30=¥12,000/月 × 1本, cus_SpjJy8yiYM1XOa=¥12,000/月 × 1本（DB紐付けは cus_UjT1OYjrx70j86）",
+      "linked": "cus_UjT1OYjrx70j86",
+      "shadow": [
+        "cus_SvM5K25nFquZK1",
+        "cus_StFpU3CZCLWK30",
+        "cus_SpjJy8yiYM1XOa"
+      ]
+    },
+    {
+      "customer": "中村 はづき <yeyue0729@live.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEi9pwEK6FvSxa=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEi9pwEK6FvSxa"
+      ]
+    },
+    {
+      "customer": "仲座 紀子 <0py4884-38x345p@ezweb.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UDehOG7PrkkYyH=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UDehOG7PrkkYyH"
+      ]
+    },
+    {
+      "customer": "根本 恵巳 <emnjyroot@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Tf5EDyyRg9D5UZ=¥6,000/月 × 1本（DB紐付けは cus_UmlJxUijFlMpgA）",
+      "linked": "cus_UmlJxUijFlMpgA",
+      "shadow": [
+        "cus_Tf5EDyyRg9D5UZ",
+        "cus_SwWW8707k5YpWL"
+      ]
+    },
+    {
+      "customer": "SUN <fukfukrinrin@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SGGqhHzd2qz8fQ=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SGGqhHzd2qz8fQ"
+      ]
+    },
+    {
+      "customer": "谷口　乃梨子 <moji9004@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TyA1aHXXQDcAe6=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TyA1aHXXQDcAe6",
+        "cus_TPJ99hrecbKqxE",
+        "cus_TPJ2c7mbYzBcdG"
+      ]
+    },
+    {
+      "customer": "中松 洋子 <lovelycatnanafumi@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TP61QvWSfaRVEj=¥12,000/月 × 1本, cus_SlNcf0FsugHiUJ=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TP61QvWSfaRVEj",
+        "cus_SnFXbcrccb8sOc",
+        "cus_SlNcf0FsugHiUJ"
+      ]
+    },
+    {
+      "customer": "渡辺由美子 <1999116.y@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UNGk2BlsdgZ1cg=¥3,000/月 × 1本, cus_Th4F0REwMJqvms=¥6,000/月 × 1本, cus_SaiW8DY8fQ3OBG=¥12,000/月 × 1本, cus_SPWp7y6RAZboE9=¥12,000/月 × 1本, cus_SLieyO41cpE3jk=¥1,000/月 × 1本, cus_SLKpnv4PEeTn7g=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UNGk2BlsdgZ1cg",
+        "cus_Th4F0REwMJqvms",
+        "cus_SaiW8DY8fQ3OBG",
+        "cus_SPWp7y6RAZboE9",
+        "cus_SLieyO41cpE3jk",
+        "cus_SLKpnv4PEeTn7g",
+        "cus_Rop2xdQKlIizzV"
+      ]
+    },
+    {
+      "customer": "田島 いづみ <lady-guu.20070425@ezweb.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEhObXSYgImah1=¥6,000/月 × 1本（DB紐付けは cus_UmmTDmFOosCc7f）",
+      "linked": "cus_UmmTDmFOosCc7f",
+      "shadow": [
+        "cus_UEhObXSYgImah1"
+      ]
+    },
+    {
+      "customer": "渡邉 多惠子 <dancingneco@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TU9bJafCZC9VF6=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TU9bJafCZC9VF6",
+        "cus_SvKpgED8SteU3X",
+        "cus_StR80Ij9WYa5ux"
+      ]
+    },
+    {
+      "customer": "田中 みさ <misant3145pi@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SeruMxPX348ek0=¥12,000/月 × 1本, cus_SLXOz27FZF4k1g=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SeruMxPX348ek0",
+        "cus_SLnqC1BNrrwm2G",
+        "cus_SLXOz27FZF4k1g",
+        "cus_SLXAtO7dM2NGdf"
+      ]
+    },
+    {
+      "customer": "葛谷ひとみ <hitomic.0701.mom@gmail.com>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_UmtSGx3aPZVSxD)でも課金中、さらに管理外の顧客でも課金継続 → cus_TtoMylOuFyPMVd=¥6,000/月 × 1本",
+      "linked": "cus_UmtSGx3aPZVSxD",
+      "shadow": [
+        "cus_TtoMylOuFyPMVd",
+        "cus_TebwYGtN1i7WO5"
+      ]
+    },
+    {
+      "customer": "田澤 夏江 <suzuakiharu@gmail.com>",
+      "kind": "DUP",
+      "detail": "馬「30:アイリス（大阪）」に生きた支援行が2件（1口/active + 1口/active）",
+      "ids": [
+        "755371cf-a1b3-4012-8ff8-2004aa58b202",
+        "1afdbd2d-a691-47fe-8dc4-7d60fdac48d0"
+      ]
+    },
+    {
+      "customer": "日名子 ゆかり <hinahina0125@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U1aelIFxqsgVMN=¥6,000/月 × 1本, cus_U1aADZgeXDuk7z=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U1aelIFxqsgVMN",
+        "cus_U1aADZgeXDuk7z"
+      ]
+    },
+    {
+      "customer": "二瀬香織 <kaori06030224@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TJLWUZ2WJKka0N=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TJLWUZ2WJKka0N",
+        "cus_T61UKMQ7g4SlwB",
+        "cus_Skyk4SFn8OxHAF"
+      ]
+    },
+    {
+      "customer": "武田純子 <wannyan.satooya@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U1ABmKpDnJZKhr=¥6,000/月 × 1本, cus_TOIN4Ie6gqbICI=¥12,000/月 × 1本（DB紐付けは cus_Uf28HENxKMzWDH）",
+      "linked": "cus_Uf28HENxKMzWDH",
+      "shadow": [
+        "cus_U1ABmKpDnJZKhr",
+        "cus_TOIN4Ie6gqbICI"
+      ]
+    },
+    {
+      "customer": "名嶋リサ <najima-h.risa2003.1@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TLaRFfQINshJGH=¥12,000/月 × 1本, cus_TLMaxKRAfcQiRx=¥12,000/月 × 1本, cus_SLjSAnnlh4mWjn=¥1,000/月 × 1本, cus_SJrEpK7kGIb0TD=¥24,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TLaRFfQINshJGH",
+        "cus_TLMaxKRAfcQiRx",
+        "cus_SLjSAnnlh4mWjn",
+        "cus_SJrEpK7kGIb0TD",
+        "cus_SGwhos90RhETuf",
+        "cus_SGbSjSG9LBQ65o",
+        "cus_SGZGKRooxiQIOo",
+        "cus_S8NjXLm0KhflEg",
+        "cus_Qww7t6oZuhhs7B",
+        "cus_MTPfUwiBQbTUUu"
+      ]
+    },
+    {
+      "customer": "満村珠美 <p_m_r.tama@au.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UNcdegpaZka7VU=¥12,000/月 × 1本, cus_TsV4Ip8adpb7tF=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UNcdegpaZka7VU",
+        "cus_TsV4Ip8adpb7tF",
+        "cus_ScXjFuE5S04qH5",
+        "cus_RYMYAgxqBApP4d"
+      ]
+    },
+    {
+      "customer": "天然果実 <cookie.cherry.mama@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TOd8qXYWrQFHkL=¥6,000/月 × 1本, cus_TOd4AFkeifitjh=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEXN1NZvFZOFzS",
+        "cus_TOd8qXYWrQFHkL",
+        "cus_TOd4AFkeifitjh",
+        "cus_TCqdPDQTmlnuLD",
+        "cus_TCqNLjbV5aJw2l"
+      ]
+    },
+    {
+      "customer": "矢野 真由美 <gorokonapon@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U1as2aGgDgyGZu=¥6,000/月 × 1本, cus_U1JQPqpbzehmIl=¥6,000/月 × 1本, cus_TqxrTcLZddiNAG=¥6,000/月 × 1本（DB紐付けは cus_V1tZ7V7roPJLcE）",
+      "linked": "cus_V1tZ7V7roPJLcE",
+      "shadow": [
+        "cus_U1as2aGgDgyGZu",
+        "cus_U1JQPqpbzehmIl",
+        "cus_TqxrTcLZddiNAG",
+        "cus_TPT1PubgUsyADa"
+      ]
+    },
+    {
+      "customer": "尾上 拡美 <london7963h@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_ScYNQ79Nfz1v9A=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_ScYNQ79Nfz1v9A",
+        "cus_ScYE11Y4wl8LXt"
+      ]
+    },
+    {
+      "customer": "福田正枝 <masae_fuu1@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TP6sR5s8B0IDMN=¥12,000/月 × 1本, cus_SvsGzO8EwqFMUu=¥12,000/月 × 1本, cus_SvHsYG70xCTWtF=¥12,000/月 × 1本, cus_SlDlY7XZMstlEK=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TP6sR5s8B0IDMN",
+        "cus_SvsGzO8EwqFMUu",
+        "cus_SvHsYG70xCTWtF",
+        "cus_SlDlY7XZMstlEK"
+      ]
+    },
+    {
+      "customer": "鈴木 睦子 <choco-momo-sumomo@h.vodafone.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UIgQ1LjXemAPNG=¥3,000/月 × 1本, cus_SiGdWvl7LfJbwi=¥12,000/月 × 1本, cus_SghPoCb46ma82G=¥12,000/月 × 1本, cus_SR9CJact01yI6d=¥12,000/月 × 1本, cus_SMEQADFE0wSFCj=¥1,000/月 × 1本, cus_SCN3xFxQ3SDWZN=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UIgQ1LjXemAPNG",
+        "cus_SiGdWvl7LfJbwi",
+        "cus_SghPoCb46ma82G",
+        "cus_SR9CJact01yI6d",
+        "cus_SMEQADFE0wSFCj",
+        "cus_SCN3xFxQ3SDWZN"
+      ]
+    },
+    {
+      "customer": "露崎 真由美 <buqn3639@gmail.com>",
+      "kind": "MULTISUB",
+      "detail": "生きた支援サブスクリプションが2本あります → sub_1ThirSI78wDNWYHlBQpgKBtT=¥6,000/月 (active), sub_1Thin5I78wDNWYHlvLrchCkM=¥6,000/月 (active)",
+      "subscriptionIds": [
+        "sub_1ThirSI78wDNWYHlBQpgKBtT",
+        "sub_1Thin5I78wDNWYHlvLrchCkM"
+      ]
+    },
+    {
+      "customer": "廣田まき <maki27114348@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UDvLAVRIs03lBK=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UE0zomKOLqevmn",
+        "cus_UDvLAVRIs03lBK"
+      ]
+    },
+    {
+      "customer": "勝見 一美 <dreamlights.mickey.a.go.go0603@gmail.com>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_Uqz6BCzH1mqJ5r)でも課金中、さらに管理外の顧客でも課金継続 → cus_UrfM0cgkP5uC2H=¥3,000/月 × 1本, cus_UrfLz0Oe7oAI4o=¥1,000/月 × 1本",
+      "linked": "cus_Uqz6BCzH1mqJ5r",
+      "shadow": [
+        "cus_UrfM0cgkP5uC2H",
+        "cus_UrfLz0Oe7oAI4o"
+      ]
+    },
+    {
+      "customer": "齋藤 恵美 <megu0727tomu@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Sd2thDUmgnJYdt=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_Sd2thDUmgnJYdt"
+      ]
+    },
+    {
+      "customer": "林 芳枝 <yoshiehayashi@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEigDWQRsWasVF=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEigDWQRsWasVF"
+      ]
+    },
+    {
+      "customer": "桒原美紀 <mikiy.pinklose.happily81828115@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U1X0gAsx9eo0wy=¥6,000/月 × 1本, cus_SLUrEgsuHrJju3=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U1X0gAsx9eo0wy",
+        "cus_SLUrEgsuHrJju3"
+      ]
+    },
+    {
+      "customer": "廣川 智準 <hasura999@au.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UELbiBRPU4WeU7=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UELbiBRPU4WeU7"
+      ]
+    },
+    {
+      "customer": "伊藤久美子 <poota55drive@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_USsC4Hb1cV6rQN=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_USsC4Hb1cV6rQN",
+        "cus_UGXgAxOcmAZEX5",
+        "cus_T4lJ8OT67Vu2nw"
+      ]
+    },
+    {
+      "customer": "幸田雅人 <kouda.yokohama@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UVEN7KAJxwXI8R=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UVEN7KAJxwXI8R",
+        "cus_UTI4cWfk2Ilec8"
+      ]
+    },
+    {
+      "customer": "石田成美 <tymnnf_aaawss_@i.softbank.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UHoGDWjH4atqCt=¥3,000/月 × 1本, cus_TSQYeEbrGC8uz0=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UHoGDWjH4atqCt",
+        "cus_TSQYeEbrGC8uz0",
+        "cus_TSQJg7W8mY7Dda"
+      ]
+    },
+    {
+      "customer": "始恵 吉沢 <mimi19870916@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TkhK4qQjIQ5Rew=¥1,000/月 × 1本, cus_TkhJsPUUmRnsyy=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TkhK4qQjIQ5Rew",
+        "cus_TkhJsPUUmRnsyy",
+        "cus_TkhEctuAxdP6HQ",
+        "cus_TOwaKeqj38RkE4",
+        "cus_SLW62CrpqILVvx",
+        "cus_SLSujOv7mWT71h"
+      ]
+    },
+    {
+      "customer": "ゆずちゃん <yuzu-ko.pooh@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEDNApVofIdVmO=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEDNApVofIdVmO"
+      ]
+    },
+    {
+      "customer": "斎藤恵子 <keiko.saito@ae.auone-net.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEcjpqBAb8c7Dg=¥6,000/月 × 1本, cus_SLVHqotPV24Rey=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEcjpqBAb8c7Dg",
+        "cus_TZ59nxnHVQNiJm",
+        "cus_SLVHqotPV24Rey",
+        "cus_SLVENTa8bzFQ9K",
+        "cus_SG9KXhDOpuWXF7",
+        "cus_S7VhTALR4SvX2e"
+      ]
+    },
+    {
+      "customer": "上本 敏子 <toshikokazuko0703@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U7BNL3gJh7hFS6=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U7BNL3gJh7hFS6",
+        "cus_U1uXbNyHjvhvIC"
+      ]
+    },
+    {
+      "customer": "小泉真理 <ukweli804@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Tl51LX4aYb8pfG=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_Tl51LX4aYb8pfG"
+      ]
+    },
+    {
+      "customer": "長山 晃子 <ra20131207@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U7WupESrDFNXUz=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U7WupESrDFNXUz"
+      ]
+    },
+    {
+      "customer": "横田 由美 <jun-rei_y_04-fantawan-nyan@au.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_U1G1yEMY7XPAnZ=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U1G1yEMY7XPAnZ"
+      ]
+    },
+    {
+      "customer": "西村 美保 <loveciao2525@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UIg31CW9Xe0EP3=¥3,000/月 × 1本, cus_UEIwSpLYouPpXs=¥6,000/月 × 1本, cus_SLfNU90s0fmJPI=¥1,000/月 × 1本, cus_SGHCdiS0fJjJtB=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UIg31CW9Xe0EP3",
+        "cus_UEIwSpLYouPpXs",
+        "cus_SLfNU90s0fmJPI",
+        "cus_SGHCdiS0fJjJtB",
+        "cus_S8MwomjtbI3ra7"
+      ]
+    },
+    {
+      "customer": "布施真美子 <ririkaka8787@ezweb.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TLZtCnCr3dTvG8=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TLZtCnCr3dTvG8",
+        "cus_SEDHSwZhga0iqD",
+        "cus_QfvPp9qyZqytZX"
+      ]
+    },
+    {
+      "customer": "大平 恵子 <edagen.0906@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UPnIrXMIB6aTPx=¥6,000/月 × 1本, cus_TiSIaZdSeYl6jq=¥6,000/月 × 1本, cus_SKrGvYBUSvj4q1=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UPnIrXMIB6aTPx",
+        "cus_TiSIaZdSeYl6jq",
+        "cus_SKrGvYBUSvj4q1"
+      ]
+    },
+    {
+      "customer": "佐野 みゆき <licht-1959@ezweb.ne.jp>",
+      "kind": "DUP",
+      "detail": "馬「01：パヴォーネ（千葉：山武）」に生きた支援行が3件（0.5口/active + 1口/active + 0.5口/active）",
+      "ids": [
+        "05d7d40b-8a70-4dad-b04f-354fff29cdfa",
+        "97940c0d-5792-44ef-a871-5f643c9ad16b",
+        "d977b5ea-15ea-44bc-b095-68299f7d403e"
+      ]
+    },
+    {
+      "customer": "佐野 みゆき <licht-1959@ezweb.ne.jp>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_UkEhTXJ5VhVVro)でも課金中、さらに管理外の顧客でも課金継続 → cus_TLBE2iHjg6BCR3=¥6,000/月 × 1本, cus_SLj3NWa0aFA1ED=¥1,000/月 × 1本, cus_S8GN15luo7mWIU=¥12,000/月 × 1本",
+      "linked": "cus_UkEhTXJ5VhVVro",
+      "shadow": [
+        "cus_TLBE2iHjg6BCR3",
+        "cus_SLj3NWa0aFA1ED",
+        "cus_SAOPjbwcWcLDg6",
+        "cus_S8GN15luo7mWIU",
+        "cus_QbMxzx5ObaYSCH",
+        "cus_LBfshW0iXgvdIJ"
+      ]
+    },
+    {
+      "customer": "岡村　眞紀子 <baiser0723@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SQfB8H71HNKTlt=¥12,000/月 × 1本, cus_SLkccBW51ugYgg=¥1,000/月 × 1本（DB紐付けは cus_UiaLLbczJz4OCa）",
+      "linked": "cus_UiaLLbczJz4OCa",
+      "shadow": [
+        "cus_SQfB8H71HNKTlt",
+        "cus_SLkccBW51ugYgg",
+        "cus_RaZL5nZqyU2bkq",
+        "cus_Qwr9YlwMf9bmw1",
+        "cus_Qrus4vdXqmWsxh"
+      ]
+    },
+    {
+      "customer": "加藤美保子 <09014177407@docomo.ne.jp>",
+      "kind": "DUP",
+      "detail": "馬「60：緊急支援募集馬」に生きた支援行が14件（0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete + 0.5口/incomplete）",
+      "ids": [
+        "4c5a1792-0968-4247-8126-dd805db4e4c7",
+        "3b58ed2a-94f5-45d3-9418-a9866447bade",
+        "d74f3f75-04e3-438e-8793-9ae96807084a",
+        "a6ab5326-7f68-4092-8ba0-8b408ed015b7",
+        "c19035a4-ae10-48e6-acc5-7a729771d94e",
+        "7bbe6406-13ed-4887-9886-ae83edf319e0",
+        "141468d7-a576-45cb-bd07-fad32eb462b4",
+        "2496b55f-fdb7-429f-92a7-ce8d9aa24cee",
+        "2e3150ac-4617-4872-ade8-9ca14f53c7fb",
+        "de7a6440-6bc1-459c-ba6f-4085c711bcce",
+        "8bd7d3a5-2b61-4825-8150-1ca266393b55",
+        "ece28e3f-9665-4af6-9ba8-cc44b84033f5",
+        "18739b3b-070f-4d62-88b7-9b378f6820ba",
+        "2b092769-965a-4086-9593-adcb8898aa7c"
+      ]
+    },
+    {
+      "customer": "加藤美保子 <09014177407@docomo.ne.jp>",
+      "kind": "DUP",
+      "detail": "馬「58：緊急支援募集馬」に生きた支援行が2件（0.5口/incomplete + 0.5口/incomplete）",
+      "ids": [
+        "c18f17fc-5f29-41c6-8a7e-7d508dd922e2",
+        "8297bcb4-790e-441f-97fa-840e4b4dacaa"
+      ]
+    },
+    {
+      "customer": "加藤美保子 <09014177407@docomo.ne.jp>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_V6WSwayU22X2Xc)でも課金中、さらに管理外の顧客でも課金継続 → cus_StFfMIFUIKwmfT=¥12,000/月 × 1本, cus_SlJxjs0Z9GaGjk=¥24,000/月 × 1本",
+      "linked": "cus_V6WSwayU22X2Xc",
+      "shadow": [
+        "cus_U1ZGZtCtIjCl5U",
+        "cus_TOIsDNNWP1tkJW",
+        "cus_StFfMIFUIKwmfT",
+        "cus_SlJxjs0Z9GaGjk",
+        "cus_SlAgbcVwUwCEYh",
+        "cus_SerwRazcgplXfB",
+        "cus_SPp5fhKgOA4zxO",
+        "cus_SLo70q0mPqY75G"
+      ]
+    },
+    {
+      "customer": "竹村 桂子 <uuchaj1@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TL9xqeRApPuUHu=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TL9xqeRApPuUHu",
+        "cus_QaPz66g94auyor"
+      ]
+    },
+    {
+      "customer": "坂尾 貴生子 <kiirotennis@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UHmMpz63SW8IHZ=¥3,000/月 × 1本, cus_TxTpqrNftKRVpH=¥6,000/月 × 1本, cus_TkFfxsSWVJhRjI=¥6,000/月 × 1本, cus_TcwEgkF1cAWkM5=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UHmMpz63SW8IHZ",
+        "cus_TxTpqrNftKRVpH",
+        "cus_TkFfxsSWVJhRjI",
+        "cus_TcwEgkF1cAWkM5",
+        "cus_TcwDBr2Cx41nau",
+        "cus_TOJof9jVSiS9dj",
+        "cus_SvcXZGMteGphct"
+      ]
+    },
+    {
+      "customer": "伊勢田 幸代 <npo93660@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SOsag7e7PVj8nP=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SOsag7e7PVj8nP",
+        "cus_SOsQTojol5TEBe",
+        "cus_SOsN0sZKGZombw"
+      ]
+    },
+    {
+      "customer": "小副川 かおり <fragrance_o_0105@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SvQca0HYt10XhG=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SvQca0HYt10XhG",
+        "cus_SvQX37OEThgbtx"
+      ]
+    },
+    {
+      "customer": "多田幸子 <sakkochan6@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UWXMuK17jZ8y1L=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UWXMuK17jZ8y1L",
+        "cus_SUmpp0NZlwCSpf"
+      ]
+    },
+    {
+      "customer": "木下眞理子 <m1210m223@ezweb.ne.jp>",
+      "kind": "MULTICUST",
+      "detail": "二重課金の疑い: 紐付け顧客(cus_V2nG0fhpQ0sFfC)でも課金中、さらに管理外の顧客でも課金継続 → cus_TIi9NAZ9gm3yv4=¥12,000/月 × 1本, cus_SlaXO1GfwuvbCL=¥12,000/月 × 1本, cus_SLVK6hFj8LsHsb=¥1,000/月 × 1本",
+      "linked": "cus_V2nG0fhpQ0sFfC",
+      "shadow": [
+        "cus_UDgdvZKfJyQpIr",
+        "cus_TIi9NAZ9gm3yv4",
+        "cus_SlaXO1GfwuvbCL",
+        "cus_SLVK6hFj8LsHsb",
+        "cus_SKnqMNl7N2xbfr"
+      ]
+    },
+    {
+      "customer": "小林　直美 <nao0912-operao@k.vodafone.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_ScXRGLrPt1uybd=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_ScXRGLrPt1uybd"
+      ]
+    },
+    {
+      "customer": "土方　佐江子 <tannpopo13@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TcaefMl5S26h27=¥6,000/月 × 1本, cus_TcacMrhZ0J1yJ7=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TcaefMl5S26h27",
+        "cus_TcacMrhZ0J1yJ7"
+      ]
+    },
+    {
+      "customer": "吉野なほみ <lokomoko2008@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SYt2cF33s5o2VD=¥12,000/月 × 1本（DB紐付けは cus_UfArGagafAsQWi）",
+      "linked": "cus_UfArGagafAsQWi",
+      "shadow": [
+        "cus_SYt2cF33s5o2VD",
+        "cus_NjEnK0z22T8JZd"
+      ]
+    },
+    {
+      "customer": "朝川 美和子 <boulevardfawt@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_Sew1N7JmaVU1t0=¥12,000/月 × 1本, cus_SevxwuJsg2ZToC=¥12,000/月 × 1本（DB紐付けは cus_UnVKVA59zLmole）",
+      "linked": "cus_UnVKVA59zLmole",
+      "shadow": [
+        "cus_Sew1N7JmaVU1t0",
+        "cus_SevxwuJsg2ZToC",
+        "cus_RrPgUm6FJDz2Kq",
+        "cus_RrPfeW7YbGUzYg",
+        "cus_MxernNqnsXERsV"
+      ]
+    },
+    {
+      "customer": "小日向 麻里子 <ricobinata@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SGFwJrJKj9Csd2=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SGFwJrJKj9Csd2",
+        "cus_SAHg21re1zD5Gj"
+      ]
+    },
+    {
+      "customer": "樋口 明美 <mikaharu533@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TPSarnvIfEGF5c=¥6,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_U2qDmH8cEDeVbC",
+        "cus_TPSarnvIfEGF5c"
+      ]
+    },
+    {
+      "customer": "えつこ <etsuko.kuramochi@kurasho.co.jp>",
+      "kind": "DUP",
+      "detail": "馬「44：ラテ（千葉：山武）」に生きた支援行が2件（1口/active + 1口/active）",
+      "ids": [
+        "e183eeb9-ae6c-49f9-9a4a-a8288aaae0f7",
+        "5e46b515-aa8e-40ad-b1cd-087b2d0911d8"
+      ]
+    },
+    {
+      "customer": "えつこ <etsuko.kuramochi@kurasho.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TjT8Gbn8vRzvBT=¥24,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TjT8Gbn8vRzvBT",
+        "cus_NMfuC8FGyCw8ho"
+      ]
+    },
+    {
+      "customer": "小野 雅美 <sinamon-h15.marin-h19@softbank.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEd1SB6DELd8ZU=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEd1SB6DELd8ZU"
+      ]
+    },
+    {
+      "customer": "栗林 真紀 <m0chi2_m0tare2-d0cco1syo@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEILyYfjA4a2Es=¥6,000/月 × 1本, cus_SlDEbmnAiXIIw0=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEILyYfjA4a2Es",
+        "cus_SlDEbmnAiXIIw0"
+      ]
+    },
+    {
+      "customer": "網代 亜希子 <pyo.mia@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UEHqHCLxdSVSou=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UEHqHCLxdSVSou"
+      ]
+    },
+    {
+      "customer": "原 かゆら <kiiroi_namida324@yahoo.co.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TfRia0Y65szgHU=¥6,000/月 × 1本, cus_SaF7V8kKYR6nee=¥12,000/月 × 1本, cus_SLmKDhBVRSQ51C=¥1,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TfRia0Y65szgHU",
+        "cus_SaF7V8kKYR6nee",
+        "cus_SLmKDhBVRSQ51C"
+      ]
+    },
+    {
+      "customer": "樽本澄子 <sui.414@icloud.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_ScZ16VHrVOu2Ll=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_ScZ16VHrVOu2Ll",
+        "cus_ScYt6FP2NsfQMC",
+        "cus_SU7IG2byTy858C"
+      ]
+    },
+    {
+      "customer": "立松 真紀子 <blueboxbow_418@nifty.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_SLW3FRNy2KTEjc=¥1,000/月 × 1本, cus_RrTihaduaYJrNI=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_SLW3FRNy2KTEjc",
+        "cus_RrTihaduaYJrNI",
+        "cus_PsYlfElqCoI3Sw"
+      ]
+    },
+    {
+      "customer": "藤下幸子 <calon@k6.dion.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UHzIot0iJr7tgQ=¥3,000/月 × 1本, cus_SvM2tbSkB3aIhj=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UHzIot0iJr7tgQ",
+        "cus_SvMB4Ykk3X8Ry6",
+        "cus_SvM2tbSkB3aIhj"
+      ]
+    },
+    {
+      "customer": "鶴田ゆい <kosaeru3@gmail.com>",
+      "kind": "DEAD",
+      "detail": "「49：ピース（大阪）」0.5口 (¥6,000/月, active) の Stripe item が存在しません",
+      "supportId": "16ad0143-7d64-46db-a601-d2115b16c18d",
+      "itemId": "si_UeBTQw8AYqfDmx"
+    },
+    {
+      "customer": "中村 洋子 <ku-tan.108@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UJUpYG3oBU0uME=¥3,000/月 × 1本, cus_SMAF98Om3wLmRf=¥12,000/月 × 1本, cus_SLWNGQudwggxUR=¥1,000/月 × 1本（DB紐付けは cus_UmR00qRyU8zjO8）",
+      "linked": "cus_UmR00qRyU8zjO8",
+      "shadow": [
+        "cus_UJUpYG3oBU0uME",
+        "cus_UJSqX7Pc1WKsJ8",
+        "cus_UJS5f4AHmPPZOO",
+        "cus_SMAF98Om3wLmRf",
+        "cus_SMA5TgpOS0WQSt",
+        "cus_SLtkQbJchFejt1",
+        "cus_SLtfn7sDqzbXOX",
+        "cus_SLtKvTwMrNeCyP",
+        "cus_SLssd9oJpNpVTM",
+        "cus_SLsnaonG8Z13FU",
+        "cus_SLsaEAG16ZawrV",
+        "cus_SLsWgnOVc6FPKl",
+        "cus_SLsV8QC1HXRwoz",
+        "cus_SLsL37LNPqW8oC",
+        "cus_SLs05sbmbw84UV",
+        "cus_SLrxMTgyGlNl0q",
+        "cus_SLphwxPRUhD6ph",
+        "cus_SLpeXzmmg8QKUO",
+        "cus_SLWNGQudwggxUR",
+        "cus_QbxATOQ87qFTuq"
+      ]
+    },
+    {
+      "customer": "大橋 由美子 <libertyvalley78@gmail.com>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_UKYeYCluK56xPh=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_UKYeYCluK56xPh"
+      ]
+    },
+    {
+      "customer": "牧田由樹子 <yushun-3768822@docomo.ne.jp>",
+      "kind": "SHADOW",
+      "detail": "管理外の Stripe 顧客で課金が継続しています（管理画面に表示されません） → cus_TfdylOGHdANQ7C=¥6,000/月 × 1本, cus_SxFRFzHbWNyXnH=¥12,000/月 × 1本（DB紐付けは なし）",
+      "linked": null,
+      "shadow": [
+        "cus_TfdylOGHdANQ7C",
+        "cus_SxFRFzHbWNyXnH",
+        "cus_SrAyOp0KaNs3H6",
+        "cus_SM96SYBdfWUyFS"
+      ]
+    }
+  ]
+}

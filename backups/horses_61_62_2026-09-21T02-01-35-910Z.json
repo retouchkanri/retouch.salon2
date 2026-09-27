@@ -1,0 +1,18 @@
+[
+  {
+    "id": "e0d45227-f12f-434b-be7b-3999374e6840",
+    "name": "【緊急募集】62番目",
+    "is_emergency_recruitment": false,
+    "is_supportable": true,
+    "image_url": "https://retouch-members.com/wp-content/uploads/2026/02/about_112_1-2.jpg",
+    "sort_order": -2
+  },
+  {
+    "id": "3bc333e7-5c6f-426f-b455-498415e20e7e",
+    "name": "【緊急募集】61番目",
+    "is_emergency_recruitment": false,
+    "is_supportable": true,
+    "image_url": "https://retouch-members.com/wp-content/uploads/2026/02/about_112_1-2.jpg",
+    "sort_order": -1
+  }
+]

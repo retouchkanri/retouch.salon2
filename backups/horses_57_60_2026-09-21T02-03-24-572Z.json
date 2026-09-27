@@ -1,0 +1,34 @@
+[
+  {
+    "id": "96cff2b5-7e5e-4e89-aa0e-66d3f580571d",
+    "name": "57:お名前選定中",
+    "is_emergency_recruitment": true,
+    "is_supportable": true,
+    "image_url": "https://jdpsycypgdtewgdhlkkj.supabase.co/storage/v1/object/public/avatars/horses/57-emergency.jpg",
+    "sort_order": 57
+  },
+  {
+    "id": "3a4e6e42-917e-4905-bd77-f20486a6ad0a",
+    "name": "58：お名前選定中",
+    "is_emergency_recruitment": true,
+    "is_supportable": true,
+    "image_url": "https://jdpsycypgdtewgdhlkkj.supabase.co/storage/v1/object/public/avatars/horses/58-emergency.jpg",
+    "sort_order": 58
+  },
+  {
+    "id": "d376bec0-259a-4141-9004-b7ae9a98185a",
+    "name": "59:お名前選定中",
+    "is_emergency_recruitment": true,
+    "is_supportable": true,
+    "image_url": "https://jdpsycypgdtewgdhlkkj.supabase.co/storage/v1/object/public/avatars/horses/59-emergency.jpg",
+    "sort_order": 59
+  },
+  {
+    "id": "5057c68f-0954-43ee-a657-50d3d7ea49c0",
+    "name": "60:お名前選定中",
+    "is_emergency_recruitment": true,
+    "is_supportable": true,
+    "image_url": "https://jdpsycypgdtewgdhlkkj.supabase.co/storage/v1/object/public/avatars/horses/60-emergency.jpg",
+    "sort_order": 60
+  }
+]

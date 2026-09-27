@@ -1,0 +1,475 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --font-noto-sans-jp: "Noto Sans JP", sans-serif;
+  --font-noto-serif-jp: "Noto Serif JP", serif;
+  --font-pacifico: "Pacifico", cursive;
+}
+
+html, body {
+  background: #fcfcfd;
+  color: #000000;
+  /* 全ページの既定フォントを Noto Sans JP に固定（見出し等の font-serif は Noto Serif JP）。 */
+  font-family: var(--font-noto-sans-jp), "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Meiryo", system-ui, sans-serif;
+}
+
+html {
+  height: 100%;
+  /* clip (not hidden) prevents horizontal overflow WITHOUT turning html/body
+     into a scroll container — so the window stays the scroller and the
+     position:sticky header pins reliably. */
+  overflow-x: clip;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100%;
+  overflow-x: clip;
+  max-width: 100vw;
+}
+
+/* Compact interactive controls; keep ≥14px for readability */
+button, a, input, select, textarea {
+  font-size: 14px;
+}
+
+@layer components {
+  /* ── Buttons ── */
+  /* Buttons with a soft shadow and a thin inner border. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1 px-3.5 py-1.5 font-bold
+           transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30
+           disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm rounded-lg;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-white border border-brand-light/50 hover:bg-brand-dark hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97];
+  }
+  .btn-secondary {
+    @apply btn bg-white text-brand border border-brand hover:bg-brand-50 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97];
+  }
+  .btn-accent {
+    @apply btn text-white border border-amber-200/60 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.97];
+    background-image: linear-gradient(180deg, #f7b733, #f59e0b);
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white border border-red-300/50 hover:bg-red-800 hover:-translate-y-0.5 active:scale-[0.97];
+  }
+  .btn-ghost {
+    @apply btn text-ink !shadow-none hover:bg-surface-soft active:scale-[0.97];
+  }
+
+  /* ── Cards ── */
+  .card {
+    @apply bg-white shadow-card border border-surface-line p-3 rounded-xl overflow-hidden
+           transition-all duration-200;
+  }
+
+  /* ── Form elements ── */
+  .label {
+    @apply block text-xs font-semibold text-ink-soft mb-1;
+  }
+  .input {
+    @apply w-full border border-surface-line bg-white px-3 py-1.5 text-sm rounded-lg
+           transition-colors duration-200
+           focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20;
+  }
+
+  /* ── Chips / badges ── */
+  .chip {
+    @apply inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full;
+  }
+  .chip-ok    { @apply chip bg-green-100 text-green-800; }
+  .chip-warn  { @apply chip bg-amber-100 text-amber-800; }
+  .chip-error { @apply chip bg-red-100 text-red-800; }
+  .chip-mute  { @apply chip bg-gray-100 text-gray-700; }
+
+  /* ── Staff "Full" badge (repeated by rank: owner ×3, admin ×2, moderator ×1) ── */
+  .badge-full {
+    @apply inline-flex items-center justify-center w-5 h-5 text-[11px] leading-none text-white;
+    background: linear-gradient(135deg, #fbbf24, #b45309);
+    border-radius: 3px;
+  }
+
+  /* ── Membership / role badges (gold / silver / bronze) ── */
+  .badge-gold {
+    @apply chip text-amber-900;
+    background: linear-gradient(135deg, #fde68a, #f59e0b);
+  }
+  .badge-silver {
+    @apply chip text-gray-800;
+    background: linear-gradient(135deg, #f1f5f9, #cbd5e1);
+  }
+  .badge-bronze {
+    @apply chip text-orange-50;
+    background: linear-gradient(135deg, #d6905a, #a86a3d);
+  }
+
+  /* ── Section titles ── */
+  .section-title {
+    @apply text-base font-bold text-ink mb-2 flex items-center gap-2;
+  }
+
+  /* ── Tables ── */
+  .table {
+    @apply w-full border-collapse text-sm;
+  }
+  .table th {
+    @apply bg-surface-soft text-left px-2.5 py-1.5 font-semibold text-ink-soft border-b border-surface-line text-xs;
+  }
+  .table td {
+    @apply px-2.5 py-1.5 border-b border-surface-line align-top;
+  }
+  /* 横スクロールする幅広テーブルでも操作ボタン列を常に右端に固定して見えるようにする */
+  .table th.col-actions {
+    @apply bg-surface-soft;
+    position: sticky;
+    right: 0;
+    z-index: 2;
+  }
+  .table td.col-actions {
+    @apply bg-white;
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    box-shadow: -8px 0 8px -8px rgba(0, 0, 0, 0.12);
+  }
+}
+
+/* ── Mobile: keep usable tap targets without oversized padding ── */
+@media (max-width: 640px) {
+  .btn, .btn-primary, .btn-secondary, .btn-accent, .btn-danger, .btn-ghost {
+    @apply px-4 py-2.5 text-sm;
+    min-height: 44px;
+  }
+  .input, select.input, textarea.input {
+    @apply py-2.5 text-base;
+    min-height: 44px;
+  }
+  /* Login / signup: tighter card padding on small screens */
+  .auth-page .card {
+    @apply p-3;
+  }
+}
+
+/* ── Sticky mobile CTA bar ── */
+.mobile-cta-bar {
+  @apply fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur border-t border-surface-line;
+  display: none;
+  max-width: 100vw;
+  padding: 0.5rem 0.75rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 768px) {
+  .mobile-cta-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mobile-cta-bar__actions {
+    @apply flex w-full max-w-md items-stretch justify-center gap-2;
+  }
+  .mobile-cta-btn {
+    @apply inline-flex flex-1 items-center justify-center px-4 py-3 text-sm font-bold
+           text-center shadow-md transition-all active:scale-[0.97];
+    border-radius: 4px;
+    min-height: 48px;
+    max-width: 11rem;
+  }
+  .mobile-cta-btn--primary {
+    @apply bg-brand text-white border border-brand-light/50;
+  }
+  .mobile-cta-btn--secondary {
+    @apply bg-white text-brand border-2 border-brand;
+  }
+}
+
+/* ── Button pulse animation for CTAs ── */
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45,106,79,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(45,106,79,0); }
+}
+.btn-pulse {
+  animation: btnPulse 2.4s ease-in-out infinite;
+}
+
+/* ── Community header icon: gentle bounce + glow to draw attention ── */
+@keyframes communityNavAttn {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 0 rgba(45, 106, 79, 0));
+  }
+  35% {
+    transform: translateY(-3px) scale(1.1);
+    filter: drop-shadow(0 2px 4px rgba(45, 106, 79, 0.35));
+  }
+  55% {
+    transform: translateY(-1px) scale(1.05);
+    filter: drop-shadow(0 1px 2px rgba(45, 106, 79, 0.2));
+  }
+}
+.community-nav-attn {
+  animation: communityNavAttn 2.2s ease-in-out infinite;
+}
+.community-nav-attn:hover,
+.community-nav-attn:focus-visible {
+  animation: none;
+  transform: scale(1.08);
+}
+
+/* ── Community “準備中” in-progress icon ── */
+.community-progress-icon {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.community-progress-ring {
+  position: absolute;
+  inset: 0;
+  animation: communityProgressSpin 1.4s linear infinite;
+}
+.community-progress-arc {
+  transform-origin: 28px 28px;
+}
+.community-progress-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  z-index: 1;
+}
+.community-progress-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #2d6a4f;
+  animation: communityProgressDot 1.2s ease-in-out infinite;
+}
+.community-progress-dots span:nth-child(2) { animation-delay: 0.15s; }
+.community-progress-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes communityProgressSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes communityProgressDot {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ── Hero animations ── */
+@keyframes heroFadeUp {
+  0%   { opacity: 0; transform: translateY(24px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroZoom {
+  0%   { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes heroPulse {
+  0%, 100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(45,106,79,0.55); }
+  50%      { transform: scale(1.4); box-shadow: 0 0 0 14px rgba(45,106,79,0);  }
+}
+@keyframes featureFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-7px); }
+}
+@keyframes featureGlow {
+  0%, 100% { box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2); }
+  50% { box-shadow: 0 16px 36px rgba(15, 23, 42, 0.28); }
+}
+
+.hero-fade {
+  opacity: 0;
+  animation: heroFadeUp 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.hero-delay-1 { animation-delay: 80ms; }
+.hero-delay-2 { animation-delay: 240ms; }
+.hero-delay-3 { animation-delay: 480ms; }
+.hero-delay-4 { animation-delay: 680ms; }
+.hero-delay-5 { animation-delay: 900ms; }
+
+.hero-zoom {
+  animation: heroZoom 14s ease-out forwards;
+  transform-origin: center center;
+}
+.hero-pulse {
+  animation: heroPulse 2.4s ease-in-out infinite;
+}
+/* Subtitle: scale 0 → 1 over the first 2s of a 10s loop (2s / 10s = 20%),
+   hold, then repeat every 10 seconds. */
+@keyframes heroScaleLoop {
+  0%   { transform: scale(0); opacity: 0; }
+  20%  { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.hero-scale-loop {
+  transform-origin: center;
+  animation: heroScaleLoop 10s ease-out infinite;
+}
+.feature-card {
+  @apply border border-white/50 bg-white/80 backdrop-blur-sm px-4 py-3 sm:px-5 sm:py-4 rounded-xl overflow-hidden;
+  animation: featureGlow 3.8s ease-in-out infinite;
+}
+.feature-float {
+  animation: featureFloat 4.6s ease-in-out infinite;
+}
+
+/* Homepage hero – hide scroll-top button while hero is in view */
+.scroll-top-btn {
+  transition: opacity 0.35s ease;
+}
+body.hero-active .scroll-top-btn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ── Deck card modal: clockwise spinning border ── */
+@keyframes deckBorderSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.deck-border-spin {
+  animation: deckBorderSpin 3s linear infinite;
+}
+
+/* ── Emergency support horse thumbnail: pink frame + clockwise white highlight ── */
+.emergency-horse-border-spin {
+  animation: deckBorderSpin 2.5s linear infinite;
+}
+.emergency-horse-thumb {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  padding: 2px;
+}
+.emergency-horse-thumb__inner {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: calc(0.75rem - 2px);
+  background: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ── Rich text content (Tiptap editor output / news body HTML) ── */
+.rich-text { line-height: 1.75; color: #000000; }
+.rich-text h1 { font-size: 1.5rem; font-weight: 700; color: #000000; margin-top: 1.25rem; margin-bottom: 0.6rem; }
+.rich-text h2 { font-size: 1.25rem; font-weight: 700; color: #000000; margin-top: 1rem; margin-bottom: 0.5rem; }
+.rich-text h3 { font-size: 1.1rem; font-weight: 700; color: #000000; margin-top: 0.875rem; margin-bottom: 0.4rem; }
+.rich-text p { margin-bottom: 0.75rem; }
+.rich-text ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+.rich-text ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+.rich-text li { margin-bottom: 0.25rem; }
+.rich-text a { color: #2d6a4f; text-decoration: underline; }
+.rich-text a:hover { color: #1b4332; }
+.rich-text strong, .rich-text b { font-weight: 700; color: #000000; }
+.rich-text em, .rich-text i { font-style: italic; }
+.rich-text u { text-decoration: underline; }
+.rich-text s { text-decoration: line-through; }
+.rich-text blockquote { border-left: 4px solid #e5e7eb; padding-left: 1rem; color: #000000; font-style: italic; margin-bottom: 0.75rem; }
+/* ProseMirror editor inner */
+.rich-text .ProseMirror { padding: 0.875rem 1rem; min-height: inherit; outline: none; }
+.rich-text .ProseMirror > *:last-child { margin-bottom: 0; }
+.rich-text .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* FAQ accordion */
+details summary { cursor: pointer; list-style: none; }
+details summary::-webkit-details-marker { display: none; }
+details summary::marker { display: none; }
+details[open] .faq-chevron { transform: rotate(180deg); }
+.faq-chevron { transition: transform 0.25s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-fade, .hero-zoom, .hero-pulse, .hero-scale-loop, .feature-float, .feature-card, .btn-pulse, .deck-border-spin, .emergency-horse-border-spin, .community-nav-attn,
+  .community-progress-ring, .community-progress-dots span {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ── Mobile density & motion (画面幅 < 640px = Tailwind の sm 未満) ──
+   スマホでは本文と余白を約80%に圧縮し、装飾アニメを抑えて見やすさ・収まりを改善する。
+   Tailwind の文字サイズ・余白(p-*, m-*, gap-* 等)は rem 基準のため、html の基準サイズを
+   下げるだけで「文字」と「余白」がまとめて縮小される（個別ページの改修は不要）。
+   ・入力系コントロールは 16px に固定（iOS でのフォーカス時自動ズームを防ぐための機能的措置）。
+   ・フォーカスリング・FAQ開閉・ホバー等の機能的トランジションは変更しない。 */
+@media (max-width: 639px) {
+  html {
+    font-size: 13px; /* デスクトップ基準 16px の約80%（≒81%）。文字も余白も連動して縮小 */
+  }
+  /* 文中リンク・装飾なしボタンは縮小後の基準に合わせる
+     （従来の 16px 固定だと本文より大きく浮いてしまうため）。 */
+  a, button {
+    font-size: inherit;
+  }
+  /* 文字入力系は 16px を維持（iOS の自動ズーム回避）。.input クラスも明示的に固定。 */
+  input, select, textarea, .input {
+    font-size: 16px !important;
+  }
+  /* ループ系・登場系の装飾アニメをスマホでは停止（上の prefers-reduced-motion と同じ安全な解除）。 */
+  .hero-fade, .hero-zoom, .hero-pulse, .hero-scale-loop,
+  .feature-float, .feature-card, .btn-pulse, .deck-border-spin, .emergency-horse-border-spin {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   会員コミュニティ（Slack と同じ見た目）
+   --------------------------------------------------------------------------- */
+.sk-app {
+  font-family: Lato, "Helvetica Neue", Helvetica, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", Meiryo, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: #1d1c1d;
+}
+.sk-app .font-black {
+  font-weight: 900;
+}
+/* サイドバー（濃い紫の上）の細いスクロールバー */
+.sk-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+.sk-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.sk-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+}
+.sk-scroll-light {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(29, 28, 29, 0.25) transparent;
+}
+.sk-scroll-light::-webkit-scrollbar {
+  width: 8px;
+}
+.sk-scroll-light::-webkit-scrollbar-thumb {
+  background: rgba(29, 28, 29, 0.25);
+  border-radius: 4px;
+}

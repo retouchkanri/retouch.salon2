@@ -1,0 +1,18 @@
+[
+  {
+    "id": "e0d45227-f12f-434b-be7b-3999374e6840",
+    "name": "【緊急募集】62番目",
+    "profile": "令和8年9月23日~25日",
+    "image_url": null,
+    "sort_order": -2,
+    "is_emergency_recruitment": true
+  },
+  {
+    "id": "3bc333e7-5c6f-426f-b455-498415e20e7e",
+    "name": "【緊急募集】61番目",
+    "profile": "令和8年9月23日~25日",
+    "image_url": null,
+    "sort_order": -1,
+    "is_emergency_recruitment": true
+  }
+]
