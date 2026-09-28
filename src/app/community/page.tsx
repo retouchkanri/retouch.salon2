@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import CommunityApp from "@/components/community/CommunityApp";
 import { getSession } from "@/lib/auth";
 import { normalizeInit } from "@/lib/community/api";
+import { COMMUNITY_OPEN_TO_MEMBERS, canSeeCommunity } from "@/lib/community/visibility";
 import { formatDate } from "@/lib/format";
 import { isStaffRole } from "@/lib/roles";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -52,6 +53,25 @@ export default async function CommunityPage({
     getSession(),
     supabase.rpc("community_init", { p_channel: requested ?? remembered }),
   ]);
+  // 会員に非公開の間は運営のみ利用できる（src/lib/community/visibility.ts）。
+  // メールのリンクから未ログインで開いた会員にも、ログインを求めずに更新中の案内を出す。
+  if (!COMMUNITY_OPEN_TO_MEMBERS && (!session || !canSeeCommunity(session.role))) {
+    return (
+      <Notice title="ただいまページを更新中です" back={session ? "/mypage" : "/"}>
+        <p>現在、コミュニティのページを更新しております。</p>
+        <p>ご不便をおかけいたしますが、公開まで今しばらくお待ちください。</p>
+        {!session && (
+          <p className="pt-2 text-xs">
+            運営の方は
+            <Link href={`/login?next=${encodeURIComponent("/community")}`} className="mx-0.5 text-brand underline">
+              ログイン
+            </Link>
+            してからご覧ください。
+          </p>
+        )}
+      </Notice>
+    );
+  }
   if (!session) redirect(`/login?next=${encodeURIComponent("/community")}`);
   const staff = isStaffRole(session.role);
   const back = staff ? "/admin" : "/mypage";

@@ -312,10 +312,10 @@ function ViewTabs() {
   const view = useCS((s) => s.view);
   const actions = useActions();
   const u = useUnreadTotals();
-  const tabs: { key: View; icon: IconName; label: string; badge?: number; dot?: boolean }[] = [
-    { key: "home", icon: "home", label: "ホーム", badge: u.homeCount },
-    { key: "dms", icon: "dm", label: "DM", badge: u.dm },
-    { key: "activity", icon: "bell", label: "通知", badge: u.activity },
+  const tabs: { key: View; icon: IconName; label: string; unread: number }[] = [
+    { key: "home", icon: "home", label: "ホーム", unread: u.homeCount },
+    { key: "dms", icon: "dm", label: "DM", unread: u.dm },
+    { key: "activity", icon: "bell", label: "通知", unread: u.activity },
   ];
   return (
     <div className="hidden md:flex shrink-0 px-4 pb-2" role="tablist" aria-label="表示の切り替え">
@@ -328,18 +328,20 @@ function ViewTabs() {
               type="button"
               role="tab"
               aria-selected={active}
+              aria-label={t.unread > 0 ? `${t.label}（未読あり）` : t.label}
               onClick={() => actions.setView(t.key)}
-              className={`relative flex h-8 flex-1 items-center justify-center gap-1.5 rounded-[10px] text-[12px] font-bold transition-all duration-200 ${
+              className={`relative flex h-8 flex-1 items-center justify-center rounded-[10px] transition-all duration-200 ${
                 active ? "bg-white text-[#2D6A4F] shadow-[0_1px_3px_rgba(30,43,36,0.12)]" : "text-sk-mute hover:text-sk-text"
               }`}
             >
               <Icon name={t.icon} className="w-4 h-4" strokeWidth={active ? 2.4 : 2} />
-              {t.label}
-              {t.badge ? (
-                <Badge n={t.badge} className="rc-badge-pulse ml-0.5" />
-              ) : t.dot ? (
-                <span className="h-1.5 w-1.5 rounded-full bg-[#E0782F]" aria-label="未読あり" />
-              ) : null}
+              {/* 未読は数字ではなく点のみ（アイコン専用タブ） */}
+              {t.unread > 0 && (
+                <span
+                  className="rc-badge-pulse absolute right-2 top-1.5 h-2 w-2 rounded-full bg-[#E5484D]"
+                  aria-hidden
+                />
+              )}
             </button>
           );
         })}

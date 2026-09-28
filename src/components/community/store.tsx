@@ -743,12 +743,39 @@ function createActions(store: Store, db: Db) {
   };
 
   // ---------------------------------------------------------------- realtime handlers
+  /**
+   * スレッドに返信が付いたら、親メッセージの「N件の返信」をその場で更新する。
+   * 親の更新は Realtime（UPDATE）でも届くが、届かない・遅れると元のメッセージに返信数が
+   * 出ないため、返信を受け取った／送った時点でも反映する。DB の値がすでに反映済み
+   * （last_reply_at が同じか新しい）なら何もせず、同じ返信は 1 回しか数えない。
+   */
+  const countedReplies = new Set<string>();
+  const noteReply = (reply: Message) => {
+    if (!reply.parent_id || reply.id.startsWith("optimistic:") || reply.deleted_at) return;
+    if (countedReplies.has(reply.id)) return;
+    countedReplies.add(reply.id);
+    const parent = findLoaded(reply.parent_id);
+    if (!parent) return;
+    if (parent.last_reply_at && Date.parse(parent.last_reply_at) >= Date.parse(reply.created_at)) return;
+    const uid = reply.user_id;
+    applyMessage({
+      ...parent,
+      reply_count: parent.reply_count + 1,
+      last_reply_at: reply.created_at,
+      last_reply_user_id: uid,
+      reply_user_ids: uid && !parent.reply_user_ids.includes(uid) ? [...parent.reply_user_ids, uid] : parent.reply_user_ids,
+    });
+  };
+
   const onInsert = (raw: any) => {
     const msg = api.normalizeMessage(raw);
     const myId = get().me.id;
     prepareMessages([msg]);
     applyMessage(msg, "upsert");
-    if (msg.parent_id) return;
+    if (msg.parent_id) {
+      noteReply(msg);
+      return;
+    }
 
     const ch = channelOf(msg.channel_id);
     if (!ch) {
@@ -931,6 +958,8 @@ function createActions(store: Store, db: Db) {
       stripTemp();
       prepareMessages([msg]);
       applyMessage(msg, "upsert");
+      // スレッドへの返信なら、元のメッセージの「N件の返信」をすぐ更新する
+      if (msg.parent_id) noteReply(msg);
       if (!msg.parent_id) {
         patchChannel(channelId, {
           joined: true,

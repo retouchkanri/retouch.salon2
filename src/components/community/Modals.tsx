@@ -38,6 +38,16 @@ function StaffTag() {
   return <span className="rounded-full bg-[#E3F0E8] px-2 py-[1px] text-[10px] font-bold text-[#2D6A4F]">運営</span>;
 }
 
+/** チャンネルを管理できる人の印（オーナー = チャンネルの作成者 / 管理者 = 運営スタッフ） */
+function ManagerTag({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-0.5 rounded-full bg-[#FFF3DC] px-2 py-[1px] text-[10px] font-bold text-[#A86B10]">
+      <Icon name="shield" className="w-2.5 h-2.5" />
+      {label}
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // プロフィール（表示名）
 // ---------------------------------------------------------------------------
@@ -53,6 +63,27 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement | null>(null);
   const first = !me.isStaff && !me.profile?.setup_done;
+  // メールアドレスの公開設定（既定は非公開）
+  const [emailInfo, setEmailInfo] = useState<{ loaded: boolean; email: string | null; initial: boolean }>({
+    loaded: false,
+    email: null,
+    initial: false,
+  });
+  const [showEmail, setShowEmail] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/community/profile/email-visibility", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!alive || !j) return;
+        setEmailInfo({ loaded: true, email: j.email ?? null, initial: !!j.show });
+        setShowEmail(!!j.show);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -63,6 +94,20 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
     }
     setError(null);
     setSaving(true);
+    if (emailInfo.loaded && showEmail !== emailInfo.initial) {
+      const res = await fetch("/api/community/profile/email-visibility", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ show: showEmail }),
+        credentials: "same-origin",
+      }).catch(() => null);
+      if (!res?.ok) {
+        setSaving(false);
+        setError("メールアドレスの公開設定を保存できませんでした。もう一度お試しください。");
+        return;
+      }
+      setEmailInfo((p) => ({ ...p, initial: showEmail }));
+    }
     const ok = await actions.saveProfile({ displayName: trimmed, bio, allowDm });
     setSaving(false);
     if (ok) onClose();
@@ -171,6 +216,34 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
               <span className="block text-[13px] text-sk-mute">オフにしても、運営からのメッセージは届きます。</span>
             </span>
           </label>
+        )}
+        {emailInfo.loaded && emailInfo.email && (
+          <fieldset className="rounded-[14px] border border-sk-line p-3">
+            <legend className="px-1 text-[15px] font-bold">メールアドレスの公開</legend>
+            <p className="mb-2 text-[13px] text-sk-mute">
+              {emailInfo.email}
+            </p>
+            {(
+              [
+                [false, "公開しない", "プロフィールに表示しません（運営のみ確認できます）"],
+                [true, "ほかの会員に公開する", "コミュニティのプロフィールに表示され、会員があなたにメールを送れます"],
+              ] as const
+            ).map(([v, label, note]) => (
+              <label key={String(v)} className="flex cursor-pointer items-start gap-2 py-1 text-[15px]">
+                <input
+                  type="radio"
+                  name="show-email"
+                  className="mt-1 h-4 w-4"
+                  checked={showEmail === v}
+                  onChange={() => setShowEmail(v)}
+                />
+                <span>
+                  {label}
+                  <span className="block text-[13px] text-sk-mute">{note}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
         )}
         {error && <p className="text-[13px] font-bold text-[#D2475E]">{error}</p>}
         <button type="submit" hidden />
@@ -908,10 +981,18 @@ function AboutTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
           }
         />
         <InfoCard
-          label="作成者"
+          label="チャンネル管理者"
           value={
-            <span className="text-sk-mute">
-              {ch.created_by ? `${creator} さん` : "Retouch 運営"}（{formatDateTime(ch.created_at)}）
+            <span className="block text-sk-mute">
+              <span className="flex flex-wrap items-center gap-1.5 text-sk-text">
+                <ManagerTag label="オーナー" />
+                {ch.created_by ? `${creator} さん` : "Retouch 運営"}
+              </span>
+              <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                <ManagerTag label="管理者" />
+                運営スタッフ（オーナー・管理者・モデレーター）全員
+              </span>
+              <span className="mt-1 block text-[12px]">作成日: {formatDateTime(ch.created_at)}</span>
             </span>
           }
         />
@@ -964,7 +1045,11 @@ function MemberRow({ userId, ch, canRemove }: { userId: string; ch: ChannelRow; 
             <span className="truncate text-[15px] font-bold">{name}</span>
             {userId === me.id && <span className="text-[13px] text-sk-mute">（自分）</span>}
             {u?.is_staff && <StaffTag />}
-            {ch.created_by === userId && <span className="text-[12px] text-sk-mute">作成者</span>}
+            {ch.created_by === userId ? (
+              <ManagerTag label="オーナー" />
+            ) : u?.is_staff ? (
+              <ManagerTag label="管理者" />
+            ) : null}
           </span>
           {me.isStaff && u?.real_name && u.real_name !== name && <span className="block truncate text-[12px] text-sk-mute">氏名: {u.real_name}</span>}
         </span>
@@ -1380,6 +1465,63 @@ function ReportModal({ message, onClose }: { message: Message; onClose: () => vo
 // ユーザーのプロフィール・既読
 // ---------------------------------------------------------------------------
 
+/**
+ * 会員のメールアドレス。本人が「公開する」を選んでいれば誰でも、運営は常に確認できる。
+ * 非公開の人を運営が見ている場合は「非公開・運営のみ表示」と添える。
+ */
+function ProfileEmail({ userId, staff }: { userId: string; staff: boolean }) {
+  const actions = useActions();
+  const [state, setState] = useState<{ loading: boolean; email: string | null; isPublic: boolean }>({
+    loading: true,
+    email: null,
+    isPublic: false,
+  });
+  useEffect(() => {
+    let alive = true;
+    setState({ loading: true, email: null, isPublic: false });
+    fetch(`/api/community/users/${userId}/email`, { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => alive && setState({ loading: false, email: (j?.email as string | null) ?? null, isPublic: !!j?.public }))
+      .catch(() => alive && setState({ loading: false, email: null, isPublic: false }));
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+  if (state.loading) return <p className="mt-1 h-5 w-48 animate-pulse rounded bg-[#1E2B240D]" aria-label="読み込み中" />;
+  if (!state.email) return null;
+  const email = state.email;
+  return (
+    <p className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] text-sk-mute sm:justify-start">
+      <span>メール:</span>
+      <a href={`mailto:${email}`} className="break-all font-bold text-sk-link hover:underline">
+        {email}
+      </a>
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(email);
+            actions.pushToast({ kind: "info", title: "メールアドレスをコピーしました。" });
+          } catch {
+            actions.pushToast({ kind: "error", title: "コピーできませんでした。" });
+          }
+        }}
+        className="inline-flex h-6 items-center gap-1 rounded-full border border-[#DCE4DE] px-2 text-[11px] font-bold text-sk-mute transition-colors hover:bg-sk-soft hover:text-sk-text"
+        title="メールアドレスをコピー"
+      >
+        <Icon name="copy" className="w-3 h-3" />
+        コピー
+      </button>
+      {staff && !state.isPublic && (
+        <span className="rounded-full bg-[#F1F5F2] px-2 py-[1px] text-[11px] text-sk-mute" title="本人はメールアドレスを公開していません">
+          非公開・運営のみ表示
+        </span>
+      )}
+    </p>
+  );
+}
+
 function UserModal({ userId, onClose }: { userId: string; onClose: () => void }) {
   const actions = useActions();
   const me = useMe();
@@ -1408,6 +1550,7 @@ function UserModal({ userId, onClose }: { userId: string; onClose: () => void })
               {u?.username && <>ユーザーネーム: {u.username}</>}
             </p>
           )}
+          {!isMe && <ProfileEmail userId={userId} staff={me.isStaff} />}
           {bio && <p className="mt-3 whitespace-pre-wrap text-[15px]">{bio}</p>}
         </div>
       </div>

@@ -6,6 +6,20 @@ import { useCallback, useEffect, useState } from "react";
 import type { UnreadSummary } from "@/lib/community/types";
 import { useCommunityNavBadge } from "./useCommunityNavBadge";
 
+// コミュニティを表示してよいか（会員に非公開の間は運営のみ。src/lib/community/visibility.ts）。
+// ヘッダーとスマホのボタンで共有し、1 回だけ問い合わせる。
+let visiblePromise: Promise<boolean> | null = null;
+function fetchVisible(): Promise<boolean> {
+  visiblePromise ??= fetch("/api/community/visibility", { credentials: "same-origin" })
+    .then((r) => (r.ok ? r.json() : { visible: false }))
+    .then((j) => j?.visible === true)
+    .catch(() => {
+      visiblePromise = null;
+      return false;
+    });
+  return visiblePromise;
+}
+
 /**
  * 「コミュニティ」リンク（未読バッジつき）。
  * - header: サイトヘッダー用
@@ -21,6 +35,14 @@ export default function CommunityNavLink({
   const pathname = usePathname() ?? "";
   const inCommunity = pathname.startsWith("/community");
   const [popup, setPopup] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void fetchVisible().then((v) => alive && setVisible(v));
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [viewport, setViewport] = useState<"unknown" | "mobile" | "desktop">("unknown");
 
   const onBump = useCallback((s: UnreadSummary) => {
@@ -42,7 +64,7 @@ export default function CommunityNavLink({
   }, [inCommunity]);
 
   // コミュニティ画面を開いている間も未読数は表示する（ポップアップはコミュニティ外のみ）
-  const summary = useCommunityNavBadge(inCommunity ? undefined : onBump, true);
+  const summary = useCommunityNavBadge(inCommunity ? undefined : onBump, visible);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -54,6 +76,8 @@ export default function CommunityNavLink({
 
   // ビューポート確定前は描画しない（ヘッダー/FAB の一瞬の二重表示を防ぐ）
   if (viewport === "unknown") return null;
+  // 会員に非公開の間は、運営以外には導線を出さない
+  if (!visible) return null;
   // ヘッダーはデスクトップ、FAB はモバイルのみ
   if (variant === "header" && viewport === "mobile") return null;
   if (variant === "fab" && viewport === "desktop") return null;

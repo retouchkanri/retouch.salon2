@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { notify, numEnv } from "./notify";
+import { isValidEmailAddress, notify, numEnv } from "./notify";
 import { fetchAllRows } from "@/lib/fetchAll";
 import type { MemberMessage } from "@/types/db";
 
@@ -45,6 +45,17 @@ function defaultNewsletterDailyCap(): number {
   return host.includes("gmail") ? 400 : 5_000;
 }
 const NEWSLETTER_DAILY_CAP = numEnv("NEWSLETTER_DAILY_CAP", defaultNewsletterDailyCap());
+
+/**
+ * 1時間あたりの自主上限。Xserver は 1,500通/時 を超えると送信を拒否するため、余裕をみて
+ * 既定 1,200通/時 で一旦止め、残りは次回の実行（newsletter-worker・5分ごと）で自動的に再開する。
+ * 既定の送信速度（1通/秒）だと 1 時間で最大 3,600 通に達しうるため、この上限が必要。
+ * Gmail（日次上限 400 通が先に効く）では実質的に作用しない。
+ */
+const NEWSLETTER_HOURLY_CAP = numEnv(
+  "NEWSLETTER_HOURLY_CAP",
+  (process.env.SMTP_HOST ?? "").toLowerCase().includes("gmail") ? 100_000 : 1_200,
+);
 
 /** 配信対象チェックボックス／APIバリデーションの共通の値一覧（単一の情報源）。 */
 export const AUDIENCE_VALUES = [
@@ -251,8 +262,28 @@ type AudienceCustomer = {
   newsletter_opt_out: boolean;
 };
 
+/**
+ * 送信してよいメールアドレスか。空白入り（"seiko.a 96@gmail.com" など）は nodemailer が
+ * 別のアドレスとして解釈して第三者に届いてしまうため、形式が正しいものだけを送信対象にする。
+ */
 function hasSendableEmail(email: string | null | undefined): boolean {
-  return Boolean(email && email.trim());
+  return isValidEmailAddress(email);
+}
+
+const INVALID_EMAIL_NOTE = "メールアドレスの形式が正しくないため送信しません（誤送信防止。顧客情報のメールアドレスを修正してください）";
+
+/**
+ * 一時的なエラー（相手側サーバーの一時拒否・混雑など 4xx）で失敗した宛先は、
+ * newsletter-worker が時間をおいて自動で再送する。再送回数は error の先頭に「[再送n回目]」として残す。
+ */
+export const RETRY_PREFIX_RE = /^\[再送(\d+)回目(?: ([0-9T:.\-+Z]+))?\]\s*/;
+export const MAX_AUTO_RETRIES = 3;
+export function isTemporaryRecipientError(error: string | null | undefined): boolean {
+  if (!error) return false;
+  const e = error.replace(RETRY_PREFIX_RE, "");
+  if (/invalid recipient address/i.test(e)) return false;
+  // SMTP の 4xx（例: "450 4.2.1", "451 4.7.1 greylisted", "452 4.2.2"）は一時的な失敗
+  return /\b4[0-9]{2}[ -]4\.\d{1,3}\.\d{1,3}\b|\b4[0-9]{2}[ -](?!5\.)|greylist|temporar(il)?y/i.test(e);
 }
 
 async function fetchCustomersByIds(admin: SupabaseClient, ids: string[]): Promise<AudienceCustomer[]> {
@@ -362,15 +393,19 @@ async function materializeRecipients(
   message: MemberMessage,
 ): Promise<number> {
   const customers = await resolveAudienceCustomers(admin, message);
-  const rows = customers.map((c) => ({
-    message_id: message.id,
-    customer_id: c.id,
-    email: c.email,
-    email_status:
-      message.channel_email && hasSendableEmail(c.email) && !c.newsletter_opt_out
-        ? "pending"
-        : "skipped",
-  }));
+  const rows = customers.map((c) => {
+    const invalid = message.channel_email && !!c.email?.trim() && !hasSendableEmail(c.email);
+    return {
+      message_id: message.id,
+      customer_id: c.id,
+      email: c.email,
+      email_status:
+        message.channel_email && hasSendableEmail(c.email) && !c.newsletter_opt_out
+          ? "pending"
+          : "skipped",
+      error: invalid ? INVALID_EMAIL_NOTE : null,
+    };
+  });
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await admin.from("member_message_recipients").upsert(rows.slice(i, i + 500), {
       onConflict: "message_id,customer_id",
@@ -427,6 +462,8 @@ export async function recomputeCounts(admin: SupabaseClient, messageId: string) 
 export function isInfrastructureSendError(error: string | null | undefined): boolean {
   if (!error) return false;
   // --- 宛先固有の失敗（その受信者だけの問題）を先に確定させる ---------------
+  // 形式が不正なアドレス（notify が送信前に弾いたもの）は宛先だけの問題
+  if (/invalid recipient address/i.test(error)) return false;
   // 基盤エラー扱いにすると order-by-id で毎回同じ行が先頭に来て配信全体が
   // 永久に止まる「毒薬行」になるため、必ず failed（個別再送）に落とす。
   // 受信者ごとの拒否は 554/5.7.1 など基盤エラーと同じコードを返すことがあるため、
@@ -464,8 +501,9 @@ export function isInfrastructureSendError(error: string | null | undefined): boo
  */
 async function countRecentBulkSends(
   admin: SupabaseClient,
+  hours = 24,
 ): Promise<{ count: number; error: string | null }> {
-  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
   const { count, error } = await admin
     .from("member_message_recipients")
     .select("id", { count: "exact", head: true })
@@ -596,12 +634,25 @@ export async function sendMemberMessage(
       throttled = true;
       throttleReason = `送信元メールアカウントの日次上限想定（${NEWSLETTER_DAILY_CAP}通/24時間）に達したため、本日はこれ以上送信せず保留しました。`;
     }
+    // 1時間あたりの上限（Xserver 1,500通/時 対策）
+    let hourlyRemaining = Number.POSITIVE_INFINITY;
+    if (!throttled) {
+      const { count: lastHour, error: hourError } = await countRecentBulkSends(admin, 1);
+      hourlyRemaining = hourError ? 0 : Math.max(0, NEWSLETTER_HOURLY_CAP - lastHour);
+      if (hourError) {
+        throttled = true;
+        throttleReason = `送信数の確認に失敗したため保留しました: ${hourError}`;
+      } else if (hourlyRemaining <= 0) {
+        throttled = true;
+        throttleReason = `1時間あたりの送信上限（${NEWSLETTER_HOURLY_CAP}通/時）に達したため一時停止しました。残りは自動で再開します。`;
+      }
+    }
 
     let processed = 0;
     while (!throttled && processed < MAX_PER_CALL && Date.now() < claimDeadline) {
       const { data: batch, error: batchError } = await admin
         .from("member_message_recipients")
-        .select("id, customer_id, email, token, customer:customers(full_name)")
+        .select("id, customer_id, email, token, error, customer:customers(full_name)")
         .eq("message_id", messageId)
         .eq("email_status", "pending")
         .order("id", { ascending: true })
@@ -618,6 +669,15 @@ export async function sendMemberMessage(
         // 送信中に関数が強制終了されると「送信済み記録だけ残って実際は未送信」に
         // なるため、締め切り後は新しい行をクレームしない。
         if (processed >= MAX_PER_CALL || Date.now() >= claimDeadline) break;
+        // 形式が不正なアドレス（配信先の登録後に見つかったもの）は送らずに対象外にする
+        if (!hasSendableEmail(r.email)) {
+          await admin
+            .from("member_message_recipients")
+            .update({ email_status: "skipped", error: INVALID_EMAIL_NOTE })
+            .eq("id", r.id)
+            .eq("email_status", "pending");
+          continue;
+        }
         const name = r.customer?.full_name ?? null;
         const html = renderEmailHtml({
           name,
@@ -668,6 +728,12 @@ export async function sendMemberMessage(
         if (res.sent) {
           processed++;
           dailyRemaining--;
+          hourlyRemaining--;
+          if (hourlyRemaining <= 0) {
+            throttled = true;
+            throttleReason = `1時間あたりの送信上限（${NEWSLETTER_HOURLY_CAP}通/時）に達したため一時停止しました。残りは自動で再開します。`;
+            break;
+          }
           if (dailyRemaining <= 0) {
             // 送信中に日次上限想定に達した。ここで打ち切り、残りは cron / 再実行で
             // 翌日以降に自動送信する。
@@ -691,9 +757,11 @@ export async function sendMemberMessage(
           break;
         }
         // 宛先固有の失敗（アドレス不正等）: failed とし、「失敗分を再送」で復旧可能。
+        // 一時的なエラー（4xx）は newsletter-worker が自動で再送するため、再送回数の印を引き継ぐ。
+        const retryMark = String(r.error ?? "").match(RETRY_PREFIX_RE)?.[0] ?? "";
         await admin
           .from("member_message_recipients")
-          .update({ email_status: "failed", sent_at: null, error: res.error ?? "send failed" })
+          .update({ email_status: "failed", sent_at: null, error: `${retryMark}${res.error ?? "send failed"}` })
           .eq("id", r.id);
         processed++;
       }

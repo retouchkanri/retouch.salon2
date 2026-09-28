@@ -8,6 +8,7 @@ import { loadPaymentStat } from "@/lib/badge";
 import HeaderUserMenu from "./HeaderUserMenu";
 import MobileCtaBar from "./MobileCtaBar";
 import CommunityNavLink from "./community/CommunityNavLink";
+import { canSeeCommunity } from "@/lib/community/visibility";
 
 export default async function SiteHeader() {
   const session = await getSession();
@@ -68,8 +69,8 @@ export default async function SiteHeader() {
           </Link>
 
           <div className="flex items-center gap-4 md:gap-6 min-w-0">
-          {/* ログイン中は常にコミュニティへの導線を表示（未読バッジは取得できたときのみ） */}
-          {session && <CommunityNavLink />}
+          {/* コミュニティへの導線（会員に非公開の間は運営のみ。src/lib/community/visibility.ts） */}
+          {session && canSeeCommunity(session.role) && <CommunityNavLink />}
 
           {/* Desktop: phone + nav */}
           <div className="hidden md:flex items-center gap-4">

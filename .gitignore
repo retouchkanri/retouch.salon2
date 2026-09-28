@@ -49,3 +49,5 @@ public/workbox-*.js
 public/workbox-*.js.map
 public/swe-worker-*.js
 public/swe-worker-*.js.map
+# Newsletter worker logs / lock (scripts/newsletter-worker.ts)
+logs/

@@ -173,6 +173,27 @@ function parseRecipients(to: string): string[] {
   return to.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+/**
+ * 送信してよいメールアドレスか（空白・山かっこ・引用符などを含まない、ドメインにドットがある普通の形式）。
+ *
+ * 2026-09-28 の障害: 会員情報に "seiko.a 96@gmail.com" のような空白入りのアドレスがあり、
+ * nodemailer がこれを「名前 seiko.a ＋ 宛先 96@gmail.com」と解釈して、無関係の第三者へ
+ * 会員の名前入りメールを送っていた。形式が不正なアドレスには絶対に送らない。
+ */
+export function isValidEmailAddress(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const e = email.trim();
+  if (e.length > 254 || /[\s<>()\[\],;:"\\]/.test(e)) return false;
+  return /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(
+    e,
+  );
+}
+
+/** 宛先の形式エラー（宛先固有の失敗。基盤障害ではない） */
+function invalidRecipientError(to: string): string {
+  return `invalid recipient address (not sent to prevent misdelivery): ${JSON.stringify(to)}`;
+}
+
 /** 環境変数を正の数値として読む。未設定・空文字・不正値は既定値に落とす。 */
 export function numEnv(name: string, def: number): number {
   const raw = process.env[name];
@@ -245,11 +266,20 @@ async function sendViaSmtp(p: NotifyPayload): Promise<{ ok: boolean; error?: str
   if (!p.to) return { ok: false, error: "no recipient" };
   const tx = p.kind === "member_message" ? smtpBulkTransport() : smtpTransport();
   if (!tx) return { ok: false, error: "smtp not configured" };
+  const recipients = parseRecipients(p.to);
+  // 形式が不正な宛先が1つでもあれば送らない（誤った第三者への送信を防ぐ）
+  const bad = recipients.find((r) => !isValidEmailAddress(r));
+  if (recipients.length === 0 || bad) return { ok: false, error: invalidRecipientError(bad ?? p.to) };
   try {
-    const recipients = parseRecipients(p.to);
     await tx.sendMail({
       from: fromHeader(),
-      to: p.to_name ? `${p.to_name} <${p.to}>` : p.to,
+      // 宛名は文字列に埋め込まず { name, address } で渡す（名前の記号で宛先が崩れないように）
+      to:
+        recipients.length === 1
+          ? p.to_name
+            ? { name: p.to_name, address: recipients[0] }
+            : recipients[0]
+          : recipients,
       subject: p.subject,
       text: p.body_text,
       html: resolveHtmlBody(p),
@@ -273,6 +303,7 @@ async function sendViaSmtp(p: NotifyPayload): Promise<{ ok: boolean; error?: str
 async function sendViaResend(p: NotifyPayload): Promise<{ ok: boolean; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey || !p.to) return { ok: false, error: "resend not configured" };
+  if (!isValidEmailAddress(p.to)) return { ok: false, error: invalidRecipientError(p.to) };
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
