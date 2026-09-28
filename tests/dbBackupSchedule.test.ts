@@ -4,7 +4,10 @@ import {
   DEFAULT_BACKUP_SETTINGS,
   MAX_SCHEDULED_ATTEMPTS,
   backupFileName,
+  backupObjectPath,
   decideScheduledRun,
+  isLegacyJsonBackup,
+  jstCalendarDate,
   latestOccurrence,
   nextOccurrence,
   parseBackupFileName,
@@ -103,20 +106,37 @@ test("parseScheduledState tolerates bad input", () => {
   assert.equal(s?.attempts, 1);
 });
 
-test("backup file names round-trip and reject anything else", () => {
-  const at = new Date("2026-09-25T18:00:12.345Z");
-  const name = backupFileName(at, "scheduled");
-  assert.equal(name, "db-backup_2026-09-25T18-00-12-345Z_scheduled.json.gz");
-  const parsed = parseBackupFileName(name);
-  assert.equal(parsed?.trigger, "scheduled");
-  assert.equal(parsed?.createdAt.toISOString(), at.toISOString());
-  assert.equal(parseBackupFileName(backupFileName(at, "manual"))?.trigger, "manual");
+test("backup file names: daily scheduled, timestamped manual, reject paths", () => {
+  const at = new Date("2026-09-25T18:00:12.345Z"); // 2026-09-26 03:00:12 JST
+  assert.equal(jstCalendarDate(at), "2026-09-26");
+  assert.equal(backupFileName(at, "scheduled"), "db-backup_2026-09-26_scheduled.tar.gz");
+  assert.equal(backupObjectPath("db-backup_2026-09-26_scheduled.tar.gz"), "backups/db-backup_2026-09-26_scheduled.tar.gz");
+
+  const daily = parseBackupFileName("db-backup_2026-09-26_scheduled.tar.gz");
+  assert.equal(daily?.trigger, "scheduled");
+  assert.equal(daily?.createdAt.toISOString(), new Date("2026-09-26T00:00:00+09:00").toISOString());
+
+  const manualName = backupFileName(at, "manual");
+  assert.equal(manualName, "db-backup_2026-09-25T18-00-12-345Z_manual.tar.gz");
+  assert.equal(parseBackupFileName(manualName)?.trigger, "manual");
+  assert.equal(parseBackupFileName(manualName)?.createdAt.toISOString(), at.toISOString());
+  assert.equal(isLegacyJsonBackup(manualName), false);
+
+  // legacy DB-only .json.gz names still parse (daily and pre-daily timestamped naming)
+  assert.equal(parseBackupFileName("db-backup_2026-09-26_scheduled.json.gz")?.trigger, "scheduled");
+  assert.equal(isLegacyJsonBackup("db-backup_2026-09-26_scheduled.json.gz"), true);
+  const legacy = parseBackupFileName("db-backup_2026-09-25T18-00-12-345Z_scheduled.json.gz");
+  assert.equal(legacy?.trigger, "scheduled");
+  assert.equal(legacy?.createdAt.toISOString(), at.toISOString());
 
   for (const bad of [
-    "../db-backup_2026-09-25T18-00-12-345Z_manual.json.gz",
-    "x/db-backup_2026-09-25T18-00-12-345Z_manual.json.gz",
-    "db-backup_2026-09-25T18-00-12-345Z_other.json.gz",
+    "../db-backup_2026-09-25T18-00-12-345Z_manual.tar.gz",
+    "x/db-backup_2026-09-25T18-00-12-345Z_manual.tar.gz",
+    "backups/db-backup_2026-09-26_scheduled.tar.gz",
+    "db-backup_2026-09-25T18-00-12-345Z_other.tar.gz",
     "db-backup_2026-09-25T18-00-12-345Z_manual.json",
+    "db-backup_2026-09-25T18-00-12-345Z_manual.tar.gz.partial",
+    "db-backup_2026-09-26_manual.tar.gz",
     "avatars/foo.png",
     "",
   ]) {
@@ -126,17 +146,17 @@ test("backup file names round-trip and reject anything else", () => {
 
 test("selectExpiredBackups keeps the newest N scheduled and never touches manual", () => {
   const names = [
-    "db-backup_2026-09-20T18-00-00-000Z_scheduled.json.gz",
-    "db-backup_2026-09-22T18-00-00-000Z_scheduled.json.gz",
-    "db-backup_2026-09-21T18-00-00-000Z_scheduled.json.gz",
-    "db-backup_2026-09-01T00-00-00-000Z_manual.json.gz",
+    "db-backup_2026-09-20_scheduled.json.gz",
+    "db-backup_2026-09-22_scheduled.tar.gz",
+    "db-backup_2026-09-21_scheduled.tar.gz",
+    "db-backup_2026-09-01T00-00-00-000Z_manual.tar.gz",
     "unrelated.txt",
   ];
-  assert.deepEqual(selectExpiredBackups(names, 2), ["db-backup_2026-09-20T18-00-00-000Z_scheduled.json.gz"]);
+  assert.deepEqual(selectExpiredBackups(names, 2), ["db-backup_2026-09-20_scheduled.json.gz"]);
   assert.deepEqual(selectExpiredBackups(names, 3), []);
   assert.deepEqual(selectExpiredBackups(names, 1), [
-    "db-backup_2026-09-21T18-00-00-000Z_scheduled.json.gz",
-    "db-backup_2026-09-20T18-00-00-000Z_scheduled.json.gz",
+    "db-backup_2026-09-21_scheduled.tar.gz",
+    "db-backup_2026-09-20_scheduled.json.gz",
   ]);
 });
 

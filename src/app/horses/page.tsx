@@ -21,7 +21,8 @@ export default async function HorsesPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <main className="flex-1">
-        <div className="max-w-5xl mx-auto px-5 pt-8">
+        {/* sticky ヘッダー下に十分な余白を取り、先頭カードが欠けないようにする */}
+        <div className="max-w-5xl mx-auto px-5 pt-6 sm:pt-8 pb-2">
           <Link href="/" className="text-brand underline text-sm">
             ← トップページへ
           </Link>

@@ -13,6 +13,7 @@ import {
   COMMUNITY_BUCKET,
   MEMBER_CODES,
 } from "./constants";
+import { removeCommunityChannelFolder, removeCommunityFiles } from "./files";
 
 type Admin = SupabaseClient<any, any, any>;
 
@@ -169,12 +170,14 @@ export async function moderateDeleteMessage(admin: Admin, messageId: string, sta
   const paths = (Array.isArray(msg.attachments) ? msg.attachments : [])
     .map((a: any) => a?.path)
     .filter((p: unknown): p is string => typeof p === "string" && p.length > 0);
-  if (paths.length > 0) await admin.storage.from(COMMUNITY_BUCKET).remove(paths);
+  if (paths.length > 0) await removeCommunityFiles(paths);
   return true;
 }
 
-/** チャンネル削除時に、そのチャンネルの添付ファイルを Storage から削除する（失敗しても続行）。 */
+/** チャンネル削除時に、そのチャンネルの添付ファイルを VPS（と旧 Storage の複製）から削除する（失敗しても続行）。 */
 export async function removeChannelFiles(admin: Admin, channelId: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/i.test(channelId)) return;
+  await removeCommunityChannelFolder(channelId).catch(() => undefined);
   try {
     const bucket = admin.storage.from(COMMUNITY_BUCKET);
     const { data: folders } = await bucket.list(channelId, { limit: 1000 });

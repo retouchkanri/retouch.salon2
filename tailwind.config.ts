@@ -34,11 +34,11 @@ const config: Config = {
         warn: "#b45309",
         danger: "#b91c1c",
         ok: "#15803d",
-        // 会員コミュニティ（Slack と同じ配色）
+        // 会員コミュニティ（Slack と同じ配色。背景は管理画面のサイドバーと同じ緑に揃える）
         sk: {
-          frame: "#350D36",
-          side: "#3F0E40",
-          hover: "#350D36",
+          frame: "#133324",
+          side: "#1b4332",
+          hover: "#133324",
           active: "#1164A3",
           presence: "#2BAC76",
           badge: "#CD2553",

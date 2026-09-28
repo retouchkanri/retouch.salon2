@@ -4,7 +4,10 @@ import { requireCapability } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { getBaseUrl } from "@/lib/site";
-import { sendMemberMessage, AUDIENCE_VALUES } from "@/lib/memberMessages";
+import { sendMemberMessage, AUDIENCE_VALUES, isFileUrlOrUploadPath } from "@/lib/memberMessages";
+
+// 添付は絶対 URL または VPS に保存したファイルのパス（/uploads/...）。
+const fileUrl = z.string().refine(isFileUrlOrUploadPath, "添付ファイルのURLが正しくありません");
 
 export const maxDuration = 60;
 // 送信元IPを日本国内に固定する（Xserver の国外IPアクセス制限対策）。vercel.json と揃えること。
@@ -28,8 +31,8 @@ const schema = z
     channel_email: z.boolean().default(false),
     audiences: z.array(z.enum(AUDIENCE_VALUES)).min(1, "配信対象を1つ以上選択してください"),
     target_customer_ids: z.array(z.string().uuid()).default([]),
-    image_urls: z.array(z.string().url()).default([]),
-    pdf_urls: z.array(z.string().url()).default([]),
+    image_urls: z.array(fileUrl).default([]),
+    pdf_urls: z.array(fileUrl).default([]),
     scheduled_at: z.string().optional().nullable(),
     // draft=下書き保存 / schedule=予約 / send=即時配信
     action: z.enum(["draft", "schedule", "send"]).default("draft"),

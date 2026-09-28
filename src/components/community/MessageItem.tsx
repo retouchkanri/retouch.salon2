@@ -9,6 +9,7 @@ import {
   formatTime,
   isImageType,
   isMentioned,
+  plainText,
   type KnownMention,
 } from "@/lib/community/text";
 import type { Message } from "@/lib/community/types";
@@ -43,11 +44,11 @@ function Attachments({ msg }: { msg: Message }) {
                   alt={a.name}
                   loading="lazy"
                   decoding="async"
-                  className="max-h-[300px] max-w-full cursor-zoom-in rounded-[8px] border border-[#1D1C1D21] bg-sk-soft object-contain sm:max-w-[360px]"
+                  className="max-h-[300px] max-w-full cursor-zoom-in rounded-[12px] border border-[#1E2B2421] bg-sk-soft object-contain sm:max-w-[360px]"
                 />
               </a>
             ) : (
-              <div key={a.path} className="h-32 w-48 animate-pulse rounded-[8px] border border-sk-line bg-sk-soft" aria-label="画像を読み込み中" />
+              <div key={a.path} className="h-32 w-48 animate-pulse rounded-[12px] border border-sk-line bg-sk-soft" aria-label="画像を読み込み中" />
             );
           })}
         </div>
@@ -60,13 +61,13 @@ function Attachments({ msg }: { msg: Message }) {
             href={url ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className={`flex max-w-[360px] items-center gap-3 rounded-[8px] border border-[#1D1C1D21] bg-white p-3 hover:bg-sk-soft ${
+            className={`flex max-w-[360px] items-center gap-3 rounded-[12px] border border-[#1E2B2421] bg-white p-3 hover:bg-sk-soft ${
               url ? "" : "pointer-events-none opacity-60"
             }`}
           >
             <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] text-white ${
-                a.type === "application/pdf" ? "bg-[#E01E5A]" : "bg-[#1D9BD1]"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-white ${
+                a.type === "application/pdf" ? "bg-[#D2475E]" : "bg-[#2D8A62]"
               }`}
             >
               <Icon name="file" className="w-5 h-5" />
@@ -108,10 +109,10 @@ function Reactions({ msg, canReact, onAdd }: { msg: Message; canReact: boolean; 
             disabled={!canReact}
             onClick={() => void actions.react(msg, emoji)}
             title={`${names.join("、")}${more} がリアクションしました`}
-            className={`inline-flex h-6 items-center gap-1 rounded-[12px] border px-[6px] text-[12px] font-bold leading-none tabular-nums transition-colors ${
+            className={`inline-flex h-7 items-center gap-1 rounded-full border px-2 text-[12px] font-bold leading-none tabular-nums transition-all duration-150 active:scale-95 ${
               mine
-                ? "border-[#1D9BD1] bg-[#E8F5FA] text-sk-link"
-                : "border-transparent bg-[#1D1C1D0F] text-sk-text hover:border-[#1D1C1D4D] hover:bg-white"
+                ? "border-[#2D8A62] bg-[#E6F3EC] text-sk-link"
+                : "border-transparent bg-[#1E2B240F] text-sk-text hover:border-[#1E2B244D] hover:bg-white"
             } disabled:cursor-default`}
           >
             <Emoji emoji={emoji} size={16} />
@@ -123,7 +124,7 @@ function Reactions({ msg, canReact, onAdd }: { msg: Message; canReact: boolean; 
         <button
           type="button"
           onClick={onAdd}
-          className="inline-flex h-6 w-8 items-center justify-center rounded-[12px] bg-[#1D1C1D0F] text-sk-mute opacity-0 group-hover:opacity-100 hover:border hover:border-[#1D1C1D4D] hover:bg-white focus:opacity-100"
+          className="inline-flex h-6 w-8 items-center justify-center rounded-[12px] bg-[#1E2B240F] text-sk-mute opacity-0 group-hover:opacity-100 hover:border hover:border-[#1E2B244D] hover:bg-white focus:opacity-100"
           aria-label="リアクションを追加"
           title="リアクションを追加"
         >
@@ -140,7 +141,7 @@ function ThreadSummary({ msg }: { msg: Message }) {
     <button
       type="button"
       onClick={() => actions.openThread(msg.id)}
-      className="group/thread mt-1 flex w-full max-w-[600px] items-center gap-2 rounded-[6px] border border-transparent p-1 pr-2 text-left hover:border-sk-line hover:bg-white"
+      className="group/thread mt-1 flex w-full max-w-[600px] items-center gap-2 rounded-[10px] border border-transparent p-1 pr-2 text-left hover:border-sk-line hover:bg-white"
     >
       <span className="flex gap-1">
         {msg.reply_user_ids.slice(0, 3).map((id) => (
@@ -192,7 +193,7 @@ function EditBox({ msg, onDone }: { msg: Message; onDone: () => void }) {
   };
 
   return (
-    <div className="mt-1 rounded-[8px] border border-[#1D1C1D4D] bg-white shadow-[0_0_0_1px_rgba(29,155,209,0.3)]">
+    <div className="mt-1 rounded-[12px] border border-[#1E2B244D] bg-white shadow-[0_0_0_1px_rgba(45,138,98,0.3)]">
       <textarea
         ref={ref}
         value={text}
@@ -212,14 +213,14 @@ function EditBox({ msg, onDone }: { msg: Message; onDone: () => void }) {
       <div className="flex justify-end gap-2 px-2 pb-2">
         <button
           type="button"
-          className="h-7 rounded-[4px] border border-[#1D1C1D4D] bg-white px-3 text-[13px] font-bold hover:bg-sk-soft"
+          className="h-7 rounded-[8px] border border-[#1E2B244D] bg-white px-3 text-[13px] font-bold hover:bg-sk-soft"
           onClick={onDone}
         >
           キャンセル
         </button>
         <button
           type="button"
-          className="h-7 rounded-[4px] bg-sk-green px-3 text-[13px] font-bold text-white hover:bg-sk-greenhover disabled:opacity-50"
+          className="h-7 rounded-[8px] bg-sk-green px-3 text-[13px] font-bold text-white hover:bg-sk-greenhover disabled:opacity-50"
           onClick={save}
           disabled={saving}
         >
@@ -247,8 +248,8 @@ function ToolButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-8 w-8 items-center justify-center rounded-[4px] text-sk-mute hover:bg-sk-soft hover:text-sk-text ${
-        active ? "bg-sk-soft text-sk-text" : ""
+      className={`flex h-8 w-8 items-center justify-center rounded-full text-sk-mute transition-all duration-150 hover:scale-110 hover:bg-[#E3F0E8] hover:text-[#2D6A4F] ${
+        active ? "bg-[#E3F0E8] text-[#2D6A4F]" : ""
       }`}
       aria-label={label}
       title={label}
@@ -282,6 +283,7 @@ function MessageItemInner({
   const archived = useCS((s) => !!s.channels.find((c) => c.id === msg.channel_id)?.is_archived);
   const canManage = useCS((s) => !!s.channels.find((c) => c.id === msg.channel_id)?.can_manage);
   const pinnedBy = useName(msg.is_pinned ? msg.pinned_by : null);
+  const nameOf = useNameOf();
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -318,6 +320,49 @@ function MessageItemInner({
     await actions.remove(msg);
   };
 
+  const copyMessage = async () => {
+    setMenuOpen(false);
+    try {
+      await navigator.clipboard.writeText(plainText(msg.body, nameOf, 100_000));
+      actions.pushToast({ kind: "info", title: "メッセージをコピーしました。" });
+    } catch {
+      actions.pushToast({ kind: "error", title: "メッセージをコピーできませんでした。" });
+    }
+  };
+
+  type MenuAction = "edit" | "unread" | "thread" | "link" | "copy" | "pin" | "report" | "delete";
+  /** その他メニューの操作（クリックとショートカットキーの共通処理） */
+  const runMenu = (a: MenuAction) => {
+    setMenuOpen(false);
+    if (a === "edit" && canEdit) setEditing(true);
+    else if (a === "unread") void actions.markUnread(msg);
+    else if (a === "thread" && canReply) actions.openThread(msg.id);
+    else if (a === "link") void copyLink();
+    else if (a === "copy" && msg.body) void copyMessage();
+    else if (a === "pin" && canPin) void actions.pin(msg);
+    else if (a === "report" && canReport) openModal({ type: "report", message: msg });
+    else if (a === "delete" && canDelete) void onDelete();
+  };
+
+  // メニューを開いている間は、表示中のショートカットキーで操作できる
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      const map: Record<string, MenuAction> = { e: "edit", u: "unread", t: "thread", l: "link", p: "pin" };
+      let action: MenuAction | undefined;
+      if ((e.ctrlKey || e.metaKey) && k === "c") action = "copy";
+      else if (!e.ctrlKey && !e.metaKey && !e.altKey && map[k]) action = map[k];
+      else if (e.key === "Delete" || e.key === "Backspace") action = "delete";
+      if (!action) return;
+      e.preventDefault();
+      runMenu(action);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuOpen]);
+
   const showActions = !editing && !deleted && !pending;
   const openUser = () => {
     if (msg.user_id) openModal({ type: "user", userId: msg.user_id });
@@ -327,13 +372,13 @@ function MessageItemInner({
   return (
     <div
       id={`msg-${msg.id}`}
-      className={`group relative flex gap-2 px-5 ${grouped ? "py-[2px]" : "pt-2 pb-[2px]"} ${
+      className={`rc-msg group relative mx-2 flex gap-3 rounded-[14px] px-3 transition-colors duration-150 md:mx-3 ${grouped ? "py-[2px]" : "mt-1 pt-2 pb-1"} ${
         highlighted
           ? "bg-sk-yellow"
           : msg.is_pinned && !deleted
             ? "bg-sk-yellow"
             : mentionsMe
-              ? "bg-[#FEF9ED] shadow-[inset_2px_0_0_#E8912D]"
+              ? "bg-[#FFF6E5] shadow-[inset_2px_0_0_#DB9A2E]"
               : editing
                 ? "bg-sk-yellow"
                 : toolbarVisible
@@ -364,7 +409,7 @@ function MessageItemInner({
       <div className="min-w-0 flex-1">
         {msg.is_pinned && !deleted && (
           <p className="mb-0.5 flex items-center gap-1 text-[12px] text-sk-mute">
-            <Icon name="pin" className="w-3 h-3 text-[#E8912D]" />
+            <Icon name="pin" className="w-3 h-3 text-[#DB9A2E]" />
             {msg.pinned_by ? `${pinnedBy} さんがピン留めしました` : "ピン留めされています"}
           </p>
         )}
@@ -374,7 +419,7 @@ function MessageItemInner({
               {author}
             </button>
             {authorStaff && (
-              <span className="rounded-[3px] bg-[#1D1C1D14] px-1 py-[1px] text-[10px] font-bold text-sk-mute">運営</span>
+              <span className="rounded-full bg-[#E3F0E8] px-2 py-[1px] text-[10px] font-bold text-[#2D6A4F]">運営</span>
             )}
             <time
               className="text-[12px] text-sk-mute hover:underline tabular-nums"
@@ -425,10 +470,12 @@ function MessageItemInner({
 
       {showActions && (
         <div
-          className={`absolute right-5 -top-4 z-[5] items-center gap-0.5 rounded-[8px] border border-sk-line bg-white p-0.5 shadow-[0_1px_3px_rgba(0,0,0,0.08)] ${
+          className={`rc-anim-pop absolute right-3 top-1.5 z-[5] items-center gap-0.5 rounded-full border border-[#E2E9E4] bg-white/95 px-1 py-0.5 shadow-[0_6px_18px_rgba(30,43,36,0.12)] backdrop-blur ${
             toolbarVisible ? "flex" : "hidden group-hover:flex"
           }`}
         >
+          {canReply && <ToolButton icon="thread" label="スレッドで返信する" onClick={() => actions.openThread(msg.id)} />}
+          {canReply && canReact && <span className="mx-0.5 h-5 w-px bg-[#E2E9E4]" aria-hidden />}
           {canReact &&
             QUICK_REACTIONS.map((e) => (
               <ToolButton key={e} emoji={e} label={`${e} でリアクション`} onClick={() => void actions.react(msg, e)} />
@@ -448,56 +495,52 @@ function MessageItemInner({
               )}
             </div>
           )}
-          {canReply && <ToolButton icon="thread" label="スレッドで返信する" onClick={() => actions.openThread(msg.id)} />}
           <div className="relative">
             <ToolButton icon="more" label="その他" onClick={() => setMenuOpen((v) => !v)} active={menuOpen} />
             {menuOpen && (
-              <Menu onClose={() => setMenuOpen(false)} className="absolute right-0 top-9">
+              <Menu onClose={() => setMenuOpen(false)} className="absolute right-0 top-9 w-[292px]">
+                {canEdit && (
+                  <>
+                    <MenuItem icon="edit" hint="E" onClick={() => runMenu("edit")}>
+                      メッセージを編集する
+                    </MenuItem>
+                    <div className="my-1 border-t border-sk-line" />
+                  </>
+                )}
+                <MenuItem icon="eye" hint="U" onClick={() => runMenu("unread")}>
+                  未読にする
+                </MenuItem>
                 {canReply && (
-                  <MenuItem
-                    onClick={() => {
-                      setMenuOpen(false);
-                      actions.openThread(msg.id);
-                    }}
-                  >
+                  <MenuItem icon="thread" hint="T" onClick={() => runMenu("thread")}>
                     スレッドで返信する
                   </MenuItem>
                 )}
-                <MenuItem onClick={() => void copyLink()}>リンクをコピーする</MenuItem>
+                <div className="my-1 border-t border-sk-line" />
+                <MenuItem icon="link" hint="L" onClick={() => runMenu("link")}>
+                  リンクをコピーする
+                </MenuItem>
+                {!!msg.body && (
+                  <MenuItem icon="copy" hint="Ctrl+C" onClick={() => runMenu("copy")}>
+                    メッセージをコピーする
+                  </MenuItem>
+                )}
                 {canPin && (
-                  <MenuItem
-                    onClick={() => {
-                      setMenuOpen(false);
-                      void actions.pin(msg);
-                    }}
-                  >
-                    {msg.is_pinned ? "ピン留めを外す" : "チャンネルにピン留めする"}
-                  </MenuItem>
+                  <>
+                    <div className="my-1 border-t border-sk-line" />
+                    <MenuItem icon="pin" hint="P" onClick={() => runMenu("pin")}>
+                      {msg.is_pinned ? "ピン留めを外す" : "この会話にピン留めする"}
+                    </MenuItem>
+                  </>
                 )}
-                {(canEdit || canDelete || canReport) && <div className="my-1 border-t border-sk-line" />}
-                {canEdit && (
-                  <MenuItem
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setEditing(true);
-                    }}
-                  >
-                    メッセージを編集する
-                  </MenuItem>
-                )}
+                {(canReport || canDelete) && <div className="my-1 border-t border-sk-line" />}
                 {canReport && (
-                  <MenuItem
-                    onClick={() => {
-                      setMenuOpen(false);
-                      openModal({ type: "report", message: msg });
-                    }}
-                  >
+                  <MenuItem icon="flag" onClick={() => runMenu("report")}>
                     運営に通報する
                   </MenuItem>
                 )}
                 {canDelete && (
-                  <MenuItem danger onClick={() => void onDelete()}>
-                    メッセージを削除する
+                  <MenuItem icon="trash" hint="Delete" danger onClick={() => runMenu("delete")}>
+                    メッセージを削除する…
                   </MenuItem>
                 )}
               </Menu>

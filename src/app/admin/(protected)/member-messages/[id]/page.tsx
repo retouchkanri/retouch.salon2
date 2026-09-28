@@ -46,7 +46,7 @@ export default async function MemberMessageDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { rstatus?: string };
+  searchParams?: { rstatus?: string; q?: string };
 }) {
   await requireCapability("messages.manage");
   const admin = createSupabaseAdminClient();
@@ -63,6 +63,7 @@ export default async function MemberMessageDetailPage({
   const rstatus = ["pending", "sent", "failed", "skipped"].includes(searchParams?.rstatus ?? "")
     ? (searchParams!.rstatus as string)
     : "";
+  const q = (searchParams?.q ?? "").trim();
 
   // 送信状態の内訳（全件の集計。下の一覧は表示上限があるためここで正確な数を出す）
   const countBase = () =>
@@ -86,6 +87,18 @@ export default async function MemberMessageDetailPage({
   const statusTotal =
     statusCounts.pending + statusCounts.sent + statusCounts.failed + statusCounts.skipped;
 
+  // 「全アクティブ会員」配信で、現在のアクティブ会員数より配信先が少なければ取りこぼしの可能性。
+  let audienceGap = 0;
+  if (audienceList(m).includes("all") && (m.status === "sent" || m.status === "sending")) {
+    const { count: activeCount } = await admin
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active");
+    if (typeof activeCount === "number" && activeCount > statusTotal) {
+      audienceGap = activeCount - statusTotal;
+    }
+  }
+
   // 指定会員の場合は名前を解決してフォームへ渡す
   let initialTargets: { id: string; full_name: string | null; email: string | null }[] = [];
   if (audienceList(m).includes("subset") && (m.target_customer_ids ?? []).length > 0) {
@@ -96,7 +109,7 @@ export default async function MemberMessageDetailPage({
     initialTargets = (data as any[]) ?? [];
   }
 
-  // 配信先一覧（画面表示は300件まで。送信自体に件数上限はない。絞り込みで全状態を確認できる）
+  // 配信先一覧（画面表示は300件まで。氏名・メール検索で該当者を確認できる）
   let recipientsQuery = admin
     .from("member_message_recipients")
     .select("id, email, email_status, error, opened_at, read_at, customer:customers(full_name)")
@@ -104,9 +117,36 @@ export default async function MemberMessageDetailPage({
     .order("created_at", { ascending: true })
     .limit(300);
   if (rstatus) recipientsQuery = recipientsQuery.eq("email_status", rstatus);
+  if (q) {
+    // PostgREST の or に渡す値から区切り文字を除き、インジェクションを防ぐ
+    const safe = q.replace(/[%_,.()]/g, " ").trim();
+    if (safe) {
+      const { data: matchedCustomers } = await admin
+        .from("customers")
+        .select("id")
+        .or(`full_name.ilike.%${safe}%,email.ilike.%${safe}%,full_name_kana.ilike.%${safe}%`)
+        .limit(200);
+      const ids = (matchedCustomers ?? []).map((c: any) => c.id as string);
+      if (ids.length > 0) {
+        recipientsQuery = recipientsQuery.or(`email.ilike.%${safe}%,customer_id.in.(${ids.join(",")})`);
+      } else {
+        recipientsQuery = recipientsQuery.ilike("email", `%${safe}%`);
+      }
+    }
+  }
   const { data: recipients } = await recipientsQuery;
 
   const openRate = m.sent_count > 0 ? Math.round((m.open_count / m.sent_count) * 100) : 0;
+
+  const filterHref = (next: { rstatus?: string; q?: string }) => {
+    const sp = new URLSearchParams();
+    const rs = next.rstatus !== undefined ? next.rstatus : rstatus;
+    const qq = next.q !== undefined ? next.q : q;
+    if (rs) sp.set("rstatus", rs);
+    if (qq) sp.set("q", qq);
+    const s = sp.toString();
+    return s ? `/admin/member-messages/${m.id}?${s}` : `/admin/member-messages/${m.id}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -145,6 +185,8 @@ export default async function MemberMessageDetailPage({
         status={m.status}
         failedCount={statusCounts.failed}
         pendingCount={statusCounts.pending}
+        audienceGap={audienceGap}
+        recipientCount={statusTotal}
       />
 
       {editable ? (
@@ -180,8 +222,25 @@ export default async function MemberMessageDetailPage({
         <section className="space-y-2">
           <h2 className="font-bold">配信先一覧</h2>
           <p className="text-xs text-ink-mute">
-            画面に表示されるのは最大300件です（送信自体に件数の上限はありません）。状態で絞り込むと該当分を確認できます。
+            画面に表示されるのは最大300件です（送信自体に件数の上限はありません）。氏名・メールで検索すると、表示上限を超えた配信先も確認できます。
           </p>
+          <form className="flex flex-wrap gap-2 items-center" method="get">
+            {rstatus ? <input type="hidden" name="rstatus" value={rstatus} /> : null}
+            <input
+              className="input max-w-xs"
+              name="q"
+              defaultValue={q}
+              placeholder="氏名・メールで検索"
+            />
+            <button type="submit" className="btn-secondary">
+              検索
+            </button>
+            {q && (
+              <Link href={filterHref({ q: "" })} className="text-sm text-brand underline">
+                検索をクリア
+              </Link>
+            )}
+          </form>
           <div className="flex flex-wrap gap-2 text-xs">
             {[
               { key: "", label: `すべて（${statusTotal}）` },
@@ -192,7 +251,7 @@ export default async function MemberMessageDetailPage({
             ].map((f) => (
               <Link
                 key={f.key || "all"}
-                href={f.key ? `/admin/member-messages/${m.id}?rstatus=${f.key}` : `/admin/member-messages/${m.id}`}
+                href={filterHref({ rstatus: f.key })}
                 className={`px-2 py-1 rounded-lg border ${rstatus === f.key ? "bg-brand text-white border-brand" : "border-surface-line"}`}
               >
                 {f.label}
@@ -226,7 +285,9 @@ export default async function MemberMessageDetailPage({
                 ))}
                 {(recipients ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-4 text-ink-mute">該当する配信先がありません。</td>
+                    <td colSpan={6} className="text-center py-4 text-ink-mute">
+                      {q ? "検索条件に一致する配信先がありません（リスト未登録の可能性）。" : "該当する配信先がありません。"}
+                    </td>
                   </tr>
                 )}
               </tbody>

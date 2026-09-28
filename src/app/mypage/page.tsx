@@ -159,7 +159,8 @@ export default async function MyPageTop() {
               className="absolute select-none w-16 h-16 rounded-full overflow-hidden"
               style={{ right: `${i * 30 + 10}px`, top: `${i * 10 - 10}px`, transform: `rotate(${i * 15}deg)` }}
             >
-              <Image src={horseImage} alt="" fill className="object-cover" />
+              {/* 装飾用の小さな画像。fill+sizes未指定だと最適化APIが巨大サイズを要求して失敗しうる */}
+              <Image src={horseImage} alt="" width={64} height={64} className="w-full h-full object-cover" />
             </span>
           ))}
         </div>

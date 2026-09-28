@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { notify, registrationVerifyTemplate } from "@/lib/notify";
 import { getBaseUrl } from "@/lib/site";
+import { extensionForType, savePublicUpload } from "@/lib/fileStorage";
 import {
   generateRegistrationToken,
   REGISTRATION_TOKEN_TTL_MS,
@@ -71,18 +72,15 @@ async function uploadAvatar(
   if (avatarFile.size > MAX_AVATAR_BYTES) return null;
   if (!ALLOWED_AVATAR_TYPES.has(avatarFile.type)) return null;
 
-  const ext = avatarFile.name.includes(".")
-    ? avatarFile.name.slice(avatarFile.name.lastIndexOf(".") + 1).toLowerCase()
-    : avatarFile.type.split("/")[1] ?? "jpg";
+  const ext = extensionForType(avatarFile.type) ?? "jpg";
   const path = `${authUserId}/${Date.now()}.${ext}`;
   const buffer = Buffer.from(await avatarFile.arrayBuffer());
-  const { error: upErr } = await admin.storage
-    .from("avatars")
-    .upload(path, buffer, { contentType: avatarFile.type, upsert: true });
-  if (upErr) return null;
-
-  const { data: pub } = admin.storage.from("avatars").getPublicUrl(path);
-  return pub.publicUrl;
+  // ファイル本体は VPS に保存し、DB にはパス（/uploads/...）だけを保存する。
+  try {
+    return await savePublicUpload(path, buffer);
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: Request) {

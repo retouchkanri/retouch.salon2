@@ -3,7 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Icon } from "./icons";
 
-/** Slack と同じダイアログ（スマホは下から全幅）。Esc・背景クリックで閉じる。 */
+/** ダイアログ（スマホは下から全幅）。Esc・背景クリックで閉じる。 */
 export default function Modal({
   title,
   subtitle,
@@ -31,7 +31,7 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[160] flex items-end md:items-center justify-center bg-[rgba(29,28,29,0.6)] p-0 md:p-6"
+      className="rc-anim-backdrop fixed inset-0 z-[160] flex items-end md:items-center justify-center bg-[rgba(22,48,36,0.45)] p-0 backdrop-blur-[3px] md:p-6"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -40,30 +40,30 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={typeof title === "string" ? title : undefined}
-        className={`w-full ${wide ? "md:max-w-[640px]" : "md:max-w-[520px]"} max-h-[92dvh] md:max-h-[85dvh] flex flex-col bg-white text-sk-text shadow-[0_18px_48px_rgba(0,0,0,0.35)] rounded-t-[12px] md:rounded-[8px] overflow-hidden`}
+        className={`w-full ${wide ? "md:max-w-[640px]" : "md:max-w-[520px]"} max-h-[92dvh] md:max-h-[85dvh] rc-anim-pop flex flex-col bg-white text-sk-text shadow-[0_24px_60px_rgba(22,48,36,0.28)] rounded-t-[24px] md:rounded-[24px] overflow-hidden`}
       >
         <div className="flex items-start justify-between gap-3 px-7 pt-5 pb-3">
           <div className="min-w-0">
-            <h2 className="text-[22px] font-black leading-tight truncate">{title}</h2>
+            <h2 className="text-[20px] font-bold leading-tight truncate">{title}</h2>
             {subtitle && <div className="mt-1 text-[13px] text-sk-mute">{subtitle}</div>}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="-mr-3 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] text-sk-mute hover:bg-sk-soft hover:text-sk-text"
+            className="-mr-3 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sk-mute transition-all duration-200 hover:rotate-90 hover:bg-sk-soft hover:text-sk-text"
             aria-label="閉じる"
           >
             <Icon name="close" className="w-5 h-5" />
           </button>
         </div>
         <div className={`flex-1 overflow-y-auto ${bodyClassName}`}>{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-sk-line px-7 py-4">{footer}</div>}
+        {footer && <div className="flex justify-end gap-2 border-t border-sk-line bg-[#F8FAF8] px-7 py-4">{footer}</div>}
       </div>
     </div>
   );
 }
 
-/** Slack の緑のボタン */
+/** 主ボタン（緑） */
 export function PrimaryButton({
   children,
   className = "",
@@ -73,14 +73,14 @@ export function PrimaryButton({
     <button
       type="button"
       {...rest}
-      className={`h-9 rounded-[4px] bg-sk-green px-4 text-[15px] font-bold text-white hover:bg-sk-greenhover disabled:cursor-default disabled:bg-[#DDDDDD] disabled:text-[#1D1C1D80] ${className}`}
+      className={`h-10 rounded-full bg-sk-green px-5 text-[14px] font-bold text-white shadow-[0_4px_12px_rgba(45,106,79,0.22)] transition-all hover:-translate-y-0.5 hover:bg-sk-greenhover disabled:shadow-none disabled:translate-y-0 disabled:cursor-default disabled:bg-[#DCE4DE] disabled:text-[#1E2B2480] ${className}`}
     >
       {children}
     </button>
   );
 }
 
-/** Slack の白いボタン */
+/** 副ボタン（白） */
 export function SecondaryButton({
   children,
   className = "",
@@ -90,13 +90,13 @@ export function SecondaryButton({
     <button
       type="button"
       {...rest}
-      className={`h-9 rounded-[4px] border border-[#1D1C1D4D] bg-white px-4 text-[15px] font-bold text-sk-text hover:bg-sk-soft hover:shadow-[0_1px_3px_rgba(0,0,0,0.08)] disabled:opacity-50 ${className}`}
+      className={`h-10 rounded-full border border-[#DCE4DE] bg-white px-5 text-[14px] font-bold text-sk-text transition-colors hover:border-[#C7D8CD] hover:bg-sk-soft disabled:opacity-50 ${className}`}
     >
       {children}
     </button>
   );
 }
 
-/** Slack の入力欄 */
+/** 入力欄 */
 export const inputClass =
-  "w-full h-10 rounded-[4px] border border-[#1D1C1D4D] bg-white px-3 text-[15px] text-sk-text outline-none placeholder:text-[#1D1C1D80] focus:border-[#1D9BD1] focus:shadow-[0_0_0_1px_#1D9BD1,0_0_0_5px_rgba(29,155,209,0.3)]";
+  "w-full h-11 rounded-[14px] border border-[#DCE4DE] bg-[#FBFCFB] px-4 text-[15px] text-sk-text outline-none transition-all placeholder:text-[#8A968F] focus:border-[#2D6A4F] focus:bg-white focus:shadow-[0_0_0_4px_rgba(45,106,79,0.12)]";

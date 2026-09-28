@@ -170,8 +170,11 @@ export default function BottomRightPanel({
             <Image
               src={doImage}
               alt="単発寄付をする"
-              width={780}
-              height={780}
+              width={640}
+              height={640}
+              sizes="(max-width: 640px) 28vw, 360px"
+              // 約2MBのPNG。最適化API経由だと環境によって失敗し ImageError になるため、表示専用はそのまま配信する
+              unoptimized
               className="w-full h-auto object-contain"
             />
           </a>

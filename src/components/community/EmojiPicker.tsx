@@ -75,7 +75,7 @@ export default function EmojiPicker({
       ref={ref}
       role="dialog"
       aria-label="絵文字を選択"
-      className={`z-[120] w-[320px] max-w-[calc(100vw-24px)] overflow-hidden rounded-[8px] border border-sk-line bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${className}`}
+      className={`z-[120] w-[320px] max-w-[calc(100vw-24px)] overflow-hidden rounded-[12px] border border-sk-line bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15)] ${className}`}
     >
       <div className="flex gap-0.5 border-b border-sk-line px-2 pt-2" role="tablist">
         {groups.map((g, i) => (
@@ -100,7 +100,7 @@ export default function EmojiPicker({
           <button
             key={current.label + e}
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-[6px] hover:bg-[#1D9BD11A]"
+            className="flex h-9 w-9 items-center justify-center rounded-[10px] hover:bg-[#2D8A621A]"
             onMouseEnter={() => setHover(e)}
             onFocus={() => setHover(e)}
             onClick={() => pick(e)}

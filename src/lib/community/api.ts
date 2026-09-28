@@ -6,10 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   ATTACHMENT_ALLOWED_TYPES,
   ATTACHMENT_MAX_BYTES,
-  COMMUNITY_BUCKET,
   type NotifyLevel,
 } from "./constants";
-import { attachmentPath } from "./text";
 import type {
   ActivityFeed,
   Attachment,
@@ -125,7 +123,62 @@ export function bootstrap(db: Db): Promise<Bootstrap> {
 
 export async function listChannels(db: Db): Promise<ChannelRow[]> {
   const rows = await rpc<any[]>(db, "community_list_channels", undefined, "チャンネル一覧を読み込めませんでした。");
-  return (rows ?? []).map(normalizeChannel);
+  return attachIcons(db, (rows ?? []).map(normalizeChannel));
+}
+
+/**
+ * チャンネルのアイコン（community_channels.icon）を一覧に付ける。
+ * 列がまだ無い（データベース更新前）・取得に失敗した場合はアイコン無しのまま返す。
+ */
+export async function attachIcons(db: Db, rows: ChannelRow[]): Promise<ChannelRow[]> {
+  const ids = rows.filter((r) => r.kind === "channel").map((r) => r.id);
+  if (ids.length === 0) return rows;
+  try {
+    const { data, error } = await db.from("community_channels").select("id, icon").in("id", ids);
+    if (error || !data) return rows;
+    const icons = new Map<string, string | null>((data as { id: string; icon: string | null }[]).map((r) => [r.id, r.icon]));
+    return rows.map((r) => (icons.has(r.id) ? { ...r, icon: icons.get(r.id) ?? null } : r));
+  } catch {
+    return rows;
+  }
+}
+
+/** チャンネルのアイコンを設定する（画像ファイル または 絵文字）。新しいアイコンを返す。 */
+export async function setChannelIcon(channelId: string, input: { file: File } | { emoji: string }): Promise<string | null> {
+  let res: Response;
+  try {
+    if ("file" in input) {
+      const fd = new FormData();
+      fd.append("file", input.file);
+      res = await fetch(`/api/community/channels/${channelId}/icon`, { method: "POST", body: fd, credentials: "same-origin" });
+    } else {
+      res = await fetch(`/api/community/channels/${channelId}/icon`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji: input.emoji }),
+        credentials: "same-origin",
+      });
+    }
+  } catch {
+    throw new Error("通信に失敗しました。接続を確認して、もう一度お試しください。");
+  }
+  const j = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(j?.error ?? "アイコンを変更できませんでした。");
+  return (j?.icon as string | null) ?? null;
+}
+
+/** チャンネルのアイコンを外す（# / 鍵のマークに戻す）。 */
+export async function clearChannelIcon(channelId: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/community/channels/${channelId}/icon`, { method: "DELETE", credentials: "same-origin" });
+  } catch {
+    throw new Error("通信に失敗しました。接続を確認して、もう一度お試しください。");
+  }
+  if (!res.ok) {
+    const j = await res.json().catch(() => null);
+    throw new Error(j?.error ?? "アイコンを外せませんでした。");
+  }
 }
 
 export async function unreadSummary(db: Db): Promise<UnreadSummary | null> {
@@ -135,6 +188,7 @@ export async function unreadSummary(db: Db): Promise<UnreadSummary | null> {
     badge: Number((data as any).badge ?? 0) || 0,
     has_unread: !!(data as any).has_unread,
     dm_unread: Number((data as any).dm_unread ?? 0) || 0,
+    unread_total: Number((data as any).unread_total ?? (data as any).badge ?? 0) || 0,
   };
 }
 
@@ -148,6 +202,11 @@ export function leaveChannel(db: Db, channelId: string): Promise<void> {
 
 export function markRead(db: Db, channelId: string): Promise<string> {
   return rpc<string>(db, "community_mark_read", { p_channel: channelId });
+}
+
+/** 指定したメッセージ以降を未読に戻す。戻り値は新しい既読位置。 */
+export function markUnread(db: Db, messageId: string): Promise<string> {
+  return rpc<string>(db, "community_mark_unread", { p_message: messageId }, "未読にできませんでした。");
 }
 
 export function setPrefs(
@@ -174,7 +233,9 @@ export function openDm(db: Db, userId: string): Promise<string> {
 /** 画面の初期データ（利用状態・チャンネル一覧・最初のチャンネルのメッセージ）を1回で取得する。 */
 export async function init(db: Db, channelId?: string | null): Promise<InitPayload> {
   const data = await rpc<any>(db, "community_init", { p_channel: channelId ?? null }, "コミュニティを読み込めませんでした。");
-  return normalizeInit(data);
+  const payload = normalizeInit(data);
+  if (payload.is_member && payload.channels) payload.channels = await attachIcons(db, payload.channels);
+  return payload;
 }
 
 /**
@@ -278,7 +339,7 @@ export async function editMessage(db: Db, messageId: string, body: string, menti
   return normalizeMessage(data);
 }
 
-/** 削除し、添付ファイル（自分のもの）も Storage から削除する。 */
+/** 削除し、添付ファイル（自分のもの）も VPS から削除する。 */
 export async function deleteMessage(db: Db, messageId: string): Promise<void> {
   const attachments = await rpc<Attachment[] | null>(
     db,
@@ -289,7 +350,7 @@ export async function deleteMessage(db: Db, messageId: string): Promise<void> {
   const paths = (attachments ?? []).map((a) => a?.path).filter((p): p is string => typeof p === "string" && !!p);
   if (paths.length > 0) {
     // 失敗してもメッセージの削除自体は完了している（ファイルは参照されなくなる）。
-    await db.storage.from(COMMUNITY_BUCKET).remove(paths).catch(() => undefined);
+    await removeAttachments(paths);
   }
 }
 
@@ -480,30 +541,45 @@ export function validateAttachment(file: File): string | null {
   return null;
 }
 
-function randomId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-}
-
-export async function uploadAttachment(db: Db, channelId: string, userId: string, file: File): Promise<Attachment> {
+/**
+ * 添付ファイルは VPS に保存する（/api/community/files 経由。DB にはパスだけを保存）。
+ * 権限の判定はサーバー側で従来と同じ community_storage_can_* 関数を使って行う。
+ */
+export async function uploadAttachment(_db: Db, channelId: string, _userId: string, file: File): Promise<Attachment> {
   const problem = validateAttachment(file);
   if (problem) throw new Error(problem);
-  const path = attachmentPath(channelId, userId, file.name, randomId());
-  const { error } = await db.storage
-    .from(COMMUNITY_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: false, cacheControl: "3600" });
-  if (error) throw toError(error, `「${file.name}」をアップロードできませんでした。`);
-  return { path, name: file.name.slice(0, 200), type: file.type, size: file.size };
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("channelId", channelId);
+  let res: Response;
+  try {
+    res = await fetch("/api/community/files", { method: "POST", body: fd, credentials: "same-origin" });
+  } catch {
+    throw new Error("通信に失敗しました。接続を確認して、もう一度お試しください。");
+  }
+  const j = await res.json().catch(() => null);
+  if (!res.ok || typeof j?.path !== "string") {
+    throw new Error(j?.error ?? `「${file.name}」をアップロードできませんでした。`);
+  }
+  return { path: j.path, name: j.name, type: j.type, size: j.size };
 }
 
-/** 閲覧用の署名付きURL（1時間有効）。 */
-export async function signedUrls(db: Db, paths: string[]): Promise<Record<string, string>> {
-  if (paths.length === 0) return {};
-  const { data, error } = await db.storage.from(COMMUNITY_BUCKET).createSignedUrls(paths, 3600);
-  if (error || !data) return {};
+/** 添付ファイルを削除する（自分のファイル、または運営）。失敗しても例外は投げない。 */
+export async function removeAttachments(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  await fetch("/api/community/files", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paths }),
+    credentials: "same-origin",
+  }).catch(() => undefined);
+}
+
+/** 閲覧用の URL（ログイン中のユーザーの権限をサーバーが都度確認して配信する）。 */
+export async function signedUrls(_db: Db, paths: string[]): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
-  for (const item of data) {
-    if (item.path && item.signedUrl && !item.error) out[item.path] = item.signedUrl;
+  for (const p of paths) {
+    if (p) out[p] = `/api/community/files/${p.split("/").map(encodeURIComponent).join("/")}`;
   }
   return out;
 }

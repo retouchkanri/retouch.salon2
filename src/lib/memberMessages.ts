@@ -97,6 +97,31 @@ export function messageBodyHtml(body: string, format: "html" | "text"): string {
   return body; // HTMLは管理者（スタッフ）が作成する信頼済みコンテンツ
 }
 
+/**
+ * 添付の画像・PDF の値として正しいか（絶対 URL、または VPS に保存したファイルのパス `/uploads/...`）。
+ * アップロードファイルは VPS に保存し、DB にはパスだけを保存する（src/lib/fileStorage.ts）。
+ */
+export function isFileUrlOrUploadPath(value: string): boolean {
+  if (value.startsWith("/uploads/") && !value.includes("..")) return true;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** `/uploads/...` のパスをメール用の絶対 URL にする（メールクライアントは相対パスを解決できないため）。 */
+function absoluteFileUrl(url: string, baseUrl: string): string {
+  return url.startsWith("/uploads/") ? `${baseUrl.replace(/\/+$/, "")}${url}` : url;
+}
+
+/** 本文 HTML 内の src="/uploads/..." / href="/uploads/..." を絶対 URL にする。 */
+function absolutizeUploadLinks(html: string, baseUrl: string): string {
+  const base = baseUrl.replace(/\/+$/, "");
+  return html.replace(/(\s(?:src|href)\s*=\s*["'])\/uploads\//gi, `$1${base}/uploads/`);
+}
+
 function openPixelUrl(baseUrl: string, token: string): string {
   return `${baseUrl}/api/track/open/${token}`;
 }
@@ -153,8 +178,13 @@ export function renderEmailHtml(params: {
   pdfUrls?: string[];
 }): string {
   const who = (params.name?.trim() || "会員") + "様";
-  const inner = autoLinkUrls(messageBodyHtml(params.body, params.bodyFormat));
-  const attachments = attachmentsHtml(params.imageUrls ?? [], params.pdfUrls ?? []);
+  const inner = autoLinkUrls(
+    absolutizeUploadLinks(messageBodyHtml(params.body, params.bodyFormat), params.baseUrl),
+  );
+  const attachments = attachmentsHtml(
+    (params.imageUrls ?? []).map((u) => absoluteFileUrl(u, params.baseUrl)),
+    (params.pdfUrls ?? []).map((u) => absoluteFileUrl(u, params.baseUrl)),
+  );
   const pixel = openPixelUrl(params.baseUrl, params.token);
   return `<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8" />
@@ -194,7 +224,9 @@ export function renderEmailText(params: {
 }): string {
   const who = (params.name?.trim() || "会員") + "様";
   const bodyText = params.bodyFormat === "text" ? params.body : htmlToPlainText(params.body);
-  const attachments = [...(params.imageUrls ?? []), ...(params.pdfUrls ?? [])].filter(Boolean);
+  const attachments = [...(params.imageUrls ?? []), ...(params.pdfUrls ?? [])]
+    .filter(Boolean)
+    .map((u) => absoluteFileUrl(u, params.baseUrl));
   const attachmentsText = attachments.length
     ? `\n添付資料:\n${attachments.map((url) => `- ${url}`).join("\n")}\n`
     : "";
@@ -219,16 +251,21 @@ type AudienceCustomer = {
   newsletter_opt_out: boolean;
 };
 
+function hasSendableEmail(email: string | null | undefined): boolean {
+  return Boolean(email && email.trim());
+}
+
 async function fetchCustomersByIds(admin: SupabaseClient, ids: string[]): Promise<AudienceCustomer[]> {
   if (ids.length === 0) return [];
   const pageSize = 500;
   const all: AudienceCustomer[] = [];
   for (let i = 0; i < ids.length; i += pageSize) {
-    const { data } = await admin
+    const { data, error } = await admin
       .from("customers")
       .select("id, email, full_name, newsletter_opt_out")
       .in("id", ids.slice(i, i + pageSize))
       .eq("status", "active");
+    if (error) throw new Error(`会員情報の取得に失敗しました: ${error.message}`);
     if (data) all.push(...(data as AudienceCustomer[]));
   }
   return all;
@@ -267,30 +304,30 @@ async function resolveSingleAudience(
   const viewFilter = VIEW_AUDIENCE_FILTERS[audience];
   if (viewFilter) {
     // 配信対象の抽出は取りこぼしが即「未配信」になるため、1000 行上限を越えて
-    // 最後までページングする。
-    const { rows } = await fetchAllRows<any>((from, to) => {
+    // 最後までページングする。order 必須（無いとページ境界で行が抜ける）。
+    const { rows, error } = await fetchAllRows<any>((from, to) => {
       let q = admin.from("v_customer_summary").select("customer_id").eq("status", "active");
       q = viewFilter(q);
       return q.order("customer_id", { ascending: true }).range(from, to);
     });
+    if (error) throw new Error(`配信対象の取得に失敗しました: ${error.message}`);
     const ids = rows.map((r) => r.customer_id as string);
     return fetchCustomersByIds(admin, ids);
   }
 
-  // 'all'（または未知の値のフォールバック）→ 全アクティブ会員（1000件上限を超える場合に備えページング）
-  const all: AudienceCustomer[] = [];
-  const pageSize = 1000;
-  for (let from = 0; ; from += pageSize) {
-    const { data } = await admin
+  // 'all'（または未知の値のフォールバック）→ 全アクティブ会員。
+  // 必ず id 順でページングする。order 無しの .range() は PostgREST の結果順が
+  // 不定のため、ページ境界で会員が抜け落ちる（「リストにいない」事故の原因）。
+  const { rows, error } = await fetchAllRows<AudienceCustomer>((from, to) =>
+    admin
       .from("customers")
       .select("id, email, full_name, newsletter_opt_out")
       .eq("status", "active")
-      .range(from, from + pageSize - 1);
-    if (!data || data.length === 0) break;
-    all.push(...(data as AudienceCustomer[]));
-    if (data.length < pageSize) break;
-  }
-  return all;
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
+  if (error) throw new Error(`配信対象の取得に失敗しました: ${error.message}`);
+  return rows;
 }
 
 async function resolveAudienceCustomers(
@@ -313,6 +350,35 @@ async function resolveAudienceCustomers(
     for (const c of customers) merged.set(c.id, c);
   }
   return Array.from(merged.values());
+}
+
+/**
+ * 配信対象を member_message_recipients に冪等 upsert する。
+ * 既存行（送信済・失敗・対象外）は上書きせず、未登録の会員だけを追加する。
+ * 途中タイムアウトで materialize が欠けた場合や、取得漏れがあった場合の穴埋めにも使う。
+ */
+async function materializeRecipients(
+  admin: SupabaseClient,
+  message: MemberMessage,
+): Promise<number> {
+  const customers = await resolveAudienceCustomers(admin, message);
+  const rows = customers.map((c) => ({
+    message_id: message.id,
+    customer_id: c.id,
+    email: c.email,
+    email_status:
+      message.channel_email && hasSendableEmail(c.email) && !c.newsletter_opt_out
+        ? "pending"
+        : "skipped",
+  }));
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await admin.from("member_message_recipients").upsert(rows.slice(i, i + 500), {
+      onConflict: "message_id,customer_id",
+      ignoreDuplicates: true,
+    });
+    if (error) throw new Error(`配信先の登録に失敗しました: ${error.message}`);
+  }
+  return customers.length;
 }
 
 export async function recomputeCounts(admin: SupabaseClient, messageId: string) {
@@ -455,6 +521,23 @@ export async function sendMemberMessage(
       remaining: 0,
     };
   }
+
+  // 配信先を毎回冪等 upsert（未登録のみ追加）。order 無しページングや途中タイムアウトで
+  // 欠けた会員を、再実行・cron・「漏れを追加して送信」で取り戻せるようにする。
+  // ignoreDuplicates のため送信済・失敗・対象外の既存行は上書きしない。
+  try {
+    await materializeRecipients(admin, message);
+  } catch (e: any) {
+    return {
+      ok: false,
+      status: message.status,
+      recipientCount: message.recipient_count,
+      sentCount: message.sent_count,
+      remaining: 0,
+      error: e?.message ?? "配信先の登録に失敗しました",
+    };
+  }
+
   if (wasSent) {
     const { count: pendingNow } = await admin
       .from("member_message_recipients")
@@ -462,43 +545,35 @@ export async function sendMemberMessage(
       .eq("message_id", messageId)
       .eq("email_status", "pending");
     if (!pendingNow) {
-      return {
-        ok: true,
-        status: message.status,
-        recipientCount: message.recipient_count,
-        sentCount: message.sent_count,
-        remaining: 0,
-      };
+      // 穴埋め後も未送信が無ければ完了。件数は最新に揃える。
+      try {
+        const counts = await recomputeCounts(admin, messageId);
+        await admin
+          .from("member_messages")
+          .update({ recipient_count: counts.total, sent_count: counts.sent })
+          .eq("id", messageId);
+        return {
+          ok: true,
+          status: message.status,
+          recipientCount: counts.total,
+          sentCount: counts.sent,
+          remaining: 0,
+        };
+      } catch {
+        return {
+          ok: true,
+          status: message.status,
+          recipientCount: message.recipient_count,
+          sentCount: message.sent_count,
+          remaining: 0,
+        };
+      }
     }
     // 会員向けお知らせは status='sent' のみ表示されるため（mypage/announcements）、
     // 再送のあいだも 'sent' を維持し、お知らせが一時的に消えるのを防ぐ。
   } else {
     // 配信中に遷移
     await admin.from("member_messages").update({ status: "sending" }).eq("id", messageId);
-  }
-
-  // 配信先を未生成なら materialize（1会員1行・冪等）
-  const { count: existing } = await admin
-    .from("member_message_recipients")
-    .select("id", { count: "exact", head: true })
-    .eq("message_id", messageId);
-  if (!existing) {
-    const customers = await resolveAudienceCustomers(admin, message);
-    const rows = customers.map((c) => ({
-      message_id: messageId,
-      customer_id: c.id,
-      email: c.email,
-      email_status:
-        message.channel_email && c.email && !c.newsletter_opt_out ? "pending" : "skipped",
-    }));
-    for (let i = 0; i < rows.length; i += 500) {
-      await admin
-        .from("member_message_recipients")
-        .upsert(rows.slice(i, i + 500), {
-          onConflict: "message_id,customer_id",
-          ignoreDuplicates: true,
-        });
-    }
   }
 
   // メール配信（時間/件数バジェット内）

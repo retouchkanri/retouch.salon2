@@ -73,27 +73,44 @@ function ToolbarButton({
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       disabled={disabled}
-      className={`flex h-7 w-7 items-center justify-center rounded-[4px] ${
-        active ? "bg-[#1D1C1D1A] text-sk-text" : "text-[#1D1C1DB3] hover:bg-[#1D1C1D0D] hover:text-sk-text"
+      className={`flex h-7 w-7 items-center justify-center rounded-full transition-all duration-150 ${
+        active ? "bg-[#E3F0E8] text-[#2D6A4F]" : "text-[#5C6B62] hover:bg-[#E3F0E8] hover:text-[#2D6A4F]"
       } disabled:opacity-40`}
       aria-label={label}
       title={label}
     >
-      <Icon name={icon} className="w-[18px] h-[18px]" />
+      <Icon name={icon} className="w-4 h-4" />
     </button>
   );
 }
 
-/** メッセージ入力欄（Slack と同じ構成: 書式バー・@メンション・絵文字・添付・音声入力）。 */
-export default function Composer({
-  channelId,
-  parentId = null,
-  placeholder,
-}: {
+/** メッセージ入力欄（書式バー・@メンション・絵文字・添付・音声入力）。 */
+type ComposerProps = {
   channelId: string;
   parentId?: string | null;
   placeholder: string;
-}) {
+};
+
+/**
+ * 入力欄はブラウザでだけ描画する（サーバーの HTML と一致させる必要をなくし、
+ * 拡張機能による入力欄の書き換えや開発中の再読み込みで hydration エラーにならないようにする）。
+ * 描画されるまでは同じ大きさの枠を表示して、レイアウトがずれないようにする。
+ */
+export default function Composer(props: ComposerProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) {
+    return (
+      <div className={props.parentId ? "px-3 pb-2" : "px-3 pb-2 md:px-5"} aria-hidden>
+        <div className="h-[104px] rounded-[16px] border border-[#E2E9E4] bg-white" />
+        <div className="hidden md:block h-5" />
+      </div>
+    );
+  }
+  return <ComposerInner {...props} />;
+}
+
+function ComposerInner({ channelId, parentId = null, placeholder }: ComposerProps) {
   const actions = useActions();
   const isStaff = useCS((s) => s.me.isStaff);
   const chKind = useCS((s) => s.channels.find((c) => c.id === channelId)?.kind);
@@ -409,14 +426,14 @@ export default function Composer({
   const canSend = !sending && !tooLong && (text.trim().length > 0 || files.length > 0);
 
   return (
-    <div className={parentId ? "px-4 pb-2" : "px-5 pb-1"}>
+    <div className={parentId ? "px-3 pb-2" : "px-3 pb-2 md:px-5"}>
       <div
-        className={`relative rounded-[8px] border bg-white transition-shadow ${
+        className={`relative rounded-[16px] border bg-white transition-all duration-200 ${
           dragOver
-            ? "border-[#1D9BD1] shadow-[0_0_0_4px_rgba(29,155,209,0.3)]"
+            ? "border-[#2D8A62] shadow-[0_0_0_3px_rgba(45,138,98,0.18)]"
             : focused
-              ? "border-[#1D1C1D80] shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-              : "border-[#1D1C1D4D]"
+              ? "border-[#9CC3AE] shadow-[0_0_0_3px_rgba(45,106,79,0.08),0_6px_20px_rgba(30,43,36,0.08)]"
+              : "border-[#E2E9E4] shadow-[0_2px_10px_rgba(30,43,36,0.04)] hover:border-[#CFDDD4]"
         }`}
         onDragOver={(e) => {
           if (Array.from(e.dataTransfer.types).includes("Files")) {
@@ -436,7 +453,7 @@ export default function Composer({
         {popup && popup.items.length > 0 && (
           <ul
             role="listbox"
-            className="absolute bottom-full left-0 right-0 z-[30] mb-1 max-h-64 overflow-y-auto rounded-[8px] border border-sk-line bg-white py-2 shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+            className="absolute bottom-full left-0 right-0 z-[30] mb-1 max-h-64 overflow-y-auto rounded-[12px] border border-sk-line bg-white py-2 shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
           >
             <li className="px-4 pb-1 text-[13px] font-bold text-sk-mute">メンバー</li>
             {popup.items.map((c, i) => (
@@ -454,7 +471,7 @@ export default function Composer({
                   }`}
                 >
                   {c.special ? (
-                    <span className="flex h-6 w-6 items-center justify-center rounded-[6px] bg-[#1D1C1D14]">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-[10px] bg-[#1E2B2414]">
                       <Icon name="at" className="w-4 h-4" />
                     </span>
                   ) : (
@@ -476,10 +493,10 @@ export default function Composer({
         )}
 
         {showFormat && (
-          <div className="flex items-center gap-0.5 rounded-t-[8px] bg-[#F8F8F8] px-1.5 py-1">
+          <div className="rc-anim-fade-up flex flex-wrap items-center gap-px border-b border-[#EEF2EF] px-2 py-1">
             {FORMAT_BUTTONS.map((b) => (
               <span key={b.kind} className="flex items-center">
-                {b.sep && <span className="mx-1 h-5 w-px bg-[#1D1C1D21]" aria-hidden />}
+                {b.sep && <span className="mx-1 h-4 w-px bg-[#E2E9E4]" aria-hidden />}
                 <ToolbarButton icon={b.icon} label={b.label} onClick={() => format(b.kind)} disabled={sending} />
               </span>
             ))}
@@ -487,17 +504,17 @@ export default function Composer({
         )}
 
         {files.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-3 pt-3">
+          <div className="flex flex-wrap gap-2 px-3 pt-3 rc-anim-fade-up">
             {files.map((p, i) => (
               <div
                 key={i}
-                className="group/file relative flex max-w-[240px] items-center gap-2 rounded-[8px] border border-[#1D1C1D21] bg-white p-1.5 pr-3"
+                className="group/file relative flex max-w-[240px] items-center gap-2 rounded-[12px] border border-[#1E2B2421] bg-white p-1.5 pr-3"
               >
                 {p.preview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.preview} alt="" className="h-10 w-10 rounded-[6px] object-cover" />
+                  <img src={p.preview} alt="" className="h-10 w-10 rounded-[10px] object-cover" />
                 ) : (
-                  <span className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-[#1D9BD1] text-white">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#2D8A62] text-white">
                     <Icon name="file" className="w-5 h-5" />
                   </span>
                 )}
@@ -541,11 +558,11 @@ export default function Composer({
               addFiles(e.clipboardData.files);
             }
           }}
-          className="block max-h-[240px] min-h-[22px] w-full resize-none bg-transparent px-3 py-2 text-[15px] leading-[1.46668] text-sk-text outline-none placeholder:text-[#1D1C1D80]"
+          className="block max-h-[220px] min-h-[20px] w-full resize-none bg-transparent px-3.5 pb-1 pt-2.5 text-[14px] leading-[1.6] tracking-[0.01em] text-sk-text outline-none placeholder:text-[13px] placeholder:text-[#9AA59E]"
           aria-label="メッセージ"
         />
 
-        <div className="flex items-center gap-0.5 px-1.5 pb-1.5">
+        <div className="flex items-center gap-0.5 px-2 pb-1.5 pt-0.5">
           <input
             ref={fileRef}
             type="file"
@@ -560,11 +577,11 @@ export default function Composer({
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="flex h-7 w-7 items-center justify-center rounded-[999px] bg-[#1D1C1D14] text-[#1D1C1DB3] hover:bg-[#1D1C1D26] hover:text-sk-text"
+            className="mr-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#EEF5F0] text-[#2D6A4F] transition-all duration-200 hover:rotate-90 hover:bg-[#E3F0E8]"
             aria-label="ファイルを添付"
             title="ファイルを添付（画像・PDF など 10MB まで）"
           >
-            <Icon name="plus" className="w-4 h-4" strokeWidth={2.5} />
+            <Icon name="plus" className="w-3.5 h-3.5" strokeWidth={2.5} />
           </button>
           <ToolbarButton
             icon="format"
@@ -595,16 +612,18 @@ export default function Composer({
             )}
           </div>
           <ToolbarButton icon="at" label="メンション" onClick={() => insertAtCaret("@")} />
-          <span className="mx-1 h-5 w-px bg-[#1D1C1D21]" aria-hidden />
+          <span className="mx-1 h-4 w-px bg-[#E2E9E4]" aria-hidden />
           <ToolbarButton icon="mic" label={listening ? "音声入力を停止" : "音声入力"} active={listening} onClick={toggleVoice} />
-          {listening && <span className="text-[12px] font-bold text-[#E01E5A] animate-pulse">音声入力中…</span>}
-          {tooLong && <span className="ml-1 text-[12px] font-bold text-[#E01E5A]">{text.length}/{MESSAGE_MAX_LENGTH}</span>}
+          {listening && <span className="text-[11px] font-bold text-[#D2475E] animate-pulse">音声入力中…</span>}
+          {tooLong && <span className="ml-1 text-[11px] font-bold text-[#D2475E]">{text.length}/{MESSAGE_MAX_LENGTH}</span>}
           <button
             type="button"
             onClick={() => void submit()}
             disabled={!canSend}
-            className={`ml-auto flex h-7 w-8 items-center justify-center rounded-[4px] transition-colors ${
-              canSend ? "bg-sk-green text-white hover:bg-sk-greenhover" : "text-[#1D1C1D4D]"
+            className={`ml-auto flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200 ${
+              canSend
+                ? "bg-[#2D6A4F] text-white shadow-[0_3px_10px_rgba(45,106,79,0.28)] hover:-translate-y-px hover:bg-[#22553F]"
+                : "bg-[#F1F5F2] text-[#1E2B2440]"
             }`}
             aria-label={sending ? "送信中" : "送信する"}
             title="送信する（Enter）"
@@ -612,12 +631,12 @@ export default function Composer({
             {sending ? (
               <span className="h-4 w-4 animate-spin rounded-[999px] border-2 border-white/40 border-t-white" aria-hidden />
             ) : (
-              <Icon name="send" className="w-4 h-4" filled={canSend} strokeWidth={canSend ? 1.5 : 2} />
+              <Icon name="send" className="w-3.5 h-3.5" filled={canSend} strokeWidth={canSend ? 1.5 : 2} />
             )}
           </button>
         </div>
       </div>
-      <p className={`hidden md:block h-4 pt-0.5 text-right text-[11px] text-sk-mute ${text ? "visible" : "invisible"}`}>
+      <p className={`hidden md:block h-4 pr-2 pt-1 text-right text-[10.5px] text-[#9AA59E] transition-opacity duration-200 ${text ? "opacity-100" : "opacity-0"}`}>
         <b>Shift + Enter</b> で改行
       </p>
     </div>

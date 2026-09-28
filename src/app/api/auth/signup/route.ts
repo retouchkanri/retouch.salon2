@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { memberWelcomeTemplate, notify, staffRecipients } from "@/lib/notify";
+import { extensionForType, savePublicUpload } from "@/lib/fileStorage";
 
 // ⚠️ 非推奨（2026-06-22〜）: 旧・1段階サインアップAPI。
 // 会員登録は「メール確認付き2段階フロー」に置き換えました：
@@ -109,18 +110,11 @@ export async function POST(req: Request) {
 
   let avatarUrl: string | null = null;
   if (avatarFile) {
-    const ext = avatarFile.name.includes(".")
-      ? avatarFile.name.slice(avatarFile.name.lastIndexOf(".") + 1).toLowerCase()
-      : avatarFile.type.split("/")[1] ?? "jpg";
+    const ext = extensionForType(avatarFile.type) ?? "jpg";
     const path = `${userData.user.id}/${Date.now()}.${ext}`;
     const buffer = Buffer.from(await avatarFile.arrayBuffer());
-    const { error: upErr } = await admin.storage
-      .from("avatars")
-      .upload(path, buffer, { contentType: avatarFile.type, upsert: true });
-    if (!upErr) {
-      const { data: pub } = admin.storage.from("avatars").getPublicUrl(path);
-      avatarUrl = pub.publicUrl;
-    }
+    // ファイル本体は VPS に保存し、DB にはパス（/uploads/...）だけを保存する。
+    avatarUrl = await savePublicUpload(path, buffer).catch(() => null);
   }
 
   const { data: existing } = await admin

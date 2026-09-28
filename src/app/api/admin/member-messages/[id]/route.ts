@@ -3,7 +3,10 @@ import { z } from "zod";
 import { requireCapability } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
-import { AUDIENCE_VALUES } from "@/lib/memberMessages";
+import { AUDIENCE_VALUES, isFileUrlOrUploadPath } from "@/lib/memberMessages";
+
+// 添付は絶対 URL または VPS に保存したファイルのパス（/uploads/...）。
+const fileUrl = z.string().refine(isFileUrlOrUploadPath, "添付ファイルのURLが正しくありません");
 
 const patchSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
@@ -15,8 +18,8 @@ const patchSchema = z.object({
   channel_email: z.boolean().optional(),
   audiences: z.array(z.enum(AUDIENCE_VALUES)).min(1).optional(),
   target_customer_ids: z.array(z.string().uuid()).optional(),
-  image_urls: z.array(z.string().url()).optional(),
-  pdf_urls: z.array(z.string().url()).optional(),
+  image_urls: z.array(fileUrl).optional(),
+  pdf_urls: z.array(fileUrl).optional(),
   // 'draft' に戻す / 'scheduled' に予約変更
   status: z.enum(["draft", "scheduled"]).optional(),
   scheduled_at: z.string().optional().nullable(),

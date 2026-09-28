@@ -12,7 +12,7 @@ function Mention({ userId }: { userId: string }) {
   return (
     <span
       className={`rounded-[3px] px-[2px] ${
-        mine ? "bg-[#F2C74466] text-sk-text" : "bg-[#1D9BD11A] text-sk-link hover:bg-[#1D9BD133]"
+        mine ? "bg-[#F2C74466] text-sk-text" : "bg-[#2D8A621A] text-sk-link hover:bg-[#2D8A6233]"
       }`}
     >
       @{name}
@@ -46,7 +46,7 @@ function InlineNode({ node, emojiSize }: { node: Inline; emojiSize: number }) {
       );
     case "code":
       return (
-        <code className="rounded-[3px] border border-[#1D1C1D21] bg-[#1D1C1D0A] px-[3px] py-[1px] font-mono text-[12px] text-[#E01E5A]">
+        <code className="rounded-[3px] border border-[#1E2B2421] bg-[#1E2B240A] px-[3px] py-[1px] font-mono text-[12px] text-[#D2475E]">
           {node.text}
         </code>
       );
@@ -94,7 +94,7 @@ function MessageBodyInner({ body }: { body: string }) {
           return (
             <pre
               key={i}
-              className="my-1 rounded-[4px] border border-[#1D1C1D21] bg-[#1D1C1D0A] p-2 font-mono text-[12px] leading-[1.5] overflow-x-auto whitespace-pre"
+              className="my-1 rounded-[8px] border border-[#1E2B2421] bg-[#1E2B240A] p-2 font-mono text-[12px] leading-[1.5] overflow-x-auto whitespace-pre"
             >
               <code>{b.text}</code>
             </pre>
@@ -102,7 +102,7 @@ function MessageBodyInner({ body }: { body: string }) {
         }
         if (b.type === "quote") {
           return (
-            <blockquote key={i} className="my-0.5 border-l-4 border-[#DDDDDD] pl-3 text-sk-text">
+            <blockquote key={i} className="my-0.5 border-l-4 border-[#DCE4DE] pl-3 text-sk-text">
               <Inlines nodes={b.inlines} emojiSize={emojiSize} />
             </blockquote>
           );

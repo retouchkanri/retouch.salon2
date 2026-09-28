@@ -1,23 +1,32 @@
 /**
- * データベースのバックアップ（管理画面「DBバックアップ」と自動バックアップ cron から利用）。
+ * システム全体のバックアップ（管理画面「DBバックアップ」と自動バックアップ cron から利用）。
  *
- * Vercel の関数では pg_dump が使えないため、サービスロールで public スキーマの
- * 全テーブルを PostgREST 経由で全件読み出し、認証ユーザー一覧と合わせて
- * gzip 圧縮した JSON 1 ファイルにまとめ、Supabase Storage の非公開バケットに保存する。
+ * サービスロールで public スキーマの全テーブルを PostgREST 経由で全件読み出し、
+ * 認証ユーザー一覧と合わせた JSON（database.json）と、VPS に保存しているアップロードファイル一式
+ * （アバター・馬画像・お知らせ／会員向けメッセージの画像・PDF・コミュニティの添付ファイル）を
+ * 1 つの .tar.gz にまとめ、VPS のローカル `backups/` フォルダに保存する。
+ * 自動バックアップは日本時間の日付ごと 1 ファイル（同日の再試行は上書き）。
+ * 復元は scripts/restore-backup.ts（DB とファイルの両方を戻せる）。
  *
  * - 読み取りのみ（既存テーブルへの書き込みは app_settings の db_backup.* キーだけ）。
- * - 会員の個人情報を含むため、バケットは必ず非公開。ダウンロードは短時間の署名付きURLのみ。
+ * - 会員の個人情報を含むため、backups/ は公開ディレクトリの外。ダウンロードは管理者のみ（監査ログに記録）。
  * - テーブル間で完全に同一時点のスナップショットではない（数十秒の取得中の更新は混在しうる）。
  */
-import { gzip } from "node:zlib";
-import { promisify } from "node:util";
+import { createWriteStream } from "node:fs";
+import { mkdir, readdir, rename, stat, unlink } from "node:fs/promises";
+import path from "node:path";
+import { pipeline } from "node:stream/promises";
+import { createGzip } from "node:zlib";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PG_MAX_ROWS, fetchAllRows } from "./fetchAll";
 import { writeAudit } from "./audit";
+import { STORAGE_AREAS, listFiles } from "./fileStorage";
+import { TarWriter } from "./tarball";
 import {
   type BackupSettings,
   type BackupTrigger,
   type ScheduledState,
+  BACKUP_FOLDER,
   backupFileName,
   parseBackupFileName,
   parseBackupSettings,
@@ -26,11 +35,10 @@ import {
   uuidRangeBounds,
 } from "./dbBackupSchedule";
 
-const gzipAsync = promisify(gzip);
-
 type Admin = SupabaseClient<any, any, any>;
 
-export const BACKUP_BUCKET = "db-backups";
+/** 監査ログの target_table に記録する保存先の名前。 */
+const BACKUP_TARGET = "vps:" + BACKUP_FOLDER;
 
 export const BACKUP_SETTING_KEYS = {
   enabled: "db_backup.enabled",
@@ -95,6 +103,8 @@ export type LastRun = {
   rows?: number;
   tables?: number;
   auth_users?: number;
+  files?: number;
+  file_bytes?: number;
   duration_ms?: number;
   error?: string | null;
   warnings?: string[];
@@ -127,6 +137,8 @@ export type BackupRunResult =
       tableCount: number;
       rowCount: number;
       authUserCount: number;
+      fileCount: number;
+      fileBytes: number;
       durationMs: number;
       warnings: string[];
       pruned: string[];
@@ -415,21 +427,20 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export type BackupArchive = {
-  gz: Buffer;
-  rawBytes: number;
+export type DatabaseDump = {
+  json: Buffer;
   tableCount: number;
   rowCount: number;
   authUserCount: number;
   warnings: string[];
 };
 
-/** 全テーブル＋認証ユーザーを読み出して gzip 済み JSON を作る（読み取りのみ・保存はしない）。 */
-export async function buildBackupArchive(
+/** 全テーブル＋認証ユーザーを読み出して JSON（database.json の中身）を作る（読み取りのみ・保存はしない）。 */
+export async function buildDatabaseDump(
   admin: Admin,
   meta: { createdAt: Date; trigger: BackupTrigger; createdBy: string | null },
   deadline: number = Date.now() + READ_BUDGET_MS,
-): Promise<BackupArchive> {
+): Promise<DatabaseDump> {
   const { tables, warning } = await discoverTables();
   const warnings = warning ? [warning] : [];
 
@@ -460,11 +471,8 @@ export async function buildBackupArchive(
     auth_users: authUsers,
   };
 
-  const json = Buffer.from(JSON.stringify(payload), "utf8");
-  const gz = await gzipAsync(json, { level: 6 });
   return {
-    gz,
-    rawBytes: json.length,
+    json: Buffer.from(JSON.stringify(payload), "utf8"),
     tableCount: tables.length,
     rowCount,
     authUserCount: authUsers.length,
@@ -473,77 +481,146 @@ export async function buildBackupArchive(
 }
 
 // ---------------------------------------------------------------------------
-// Storage
+// フルバックアップ（1 ファイルの .tar.gz）
+//
+//   manifest.json        … 形式・作成日時・内容の件数（復元スクリプトが最初に読む）
+//   database.json        … DB の全テーブル＋認証ユーザー（buildDatabaseDump の出力）
+//   files/public/...     … 公開アップロードファイル（<FILE_STORAGE_DIR>/public/ と同じ構成）
+//   files/community/...  … コミュニティ添付ファイル（<FILE_STORAGE_DIR>/community/ と同じ構成）
+//
+// 復元: `npx tsx scripts/restore-backup.ts backups/<ファイル名>`（手順は README の「バックアップと復元」）。
 // ---------------------------------------------------------------------------
 
-/** 非公開バケットを用意する（無ければ作成、誤って公開されていれば非公開に戻す）。 */
-async function ensureBucket(admin: Admin): Promise<void> {
-  const { data } = await admin.storage.getBucket(BACKUP_BUCKET);
-  if (data) {
-    if (data.public) {
-      const { error } = await admin.storage.updateBucket(BACKUP_BUCKET, { public: false });
-      if (error) throw new Error(`バックアップ用バケットを非公開にできませんでした: ${error.message}`);
+export const FULL_BACKUP_FORMAT = "retouch-full-backup";
+
+export type FullBackupStats = {
+  bytes: number;
+  rawDbBytes: number;
+  fileCount: number;
+  fileBytes: number;
+};
+
+export async function writeFullBackup(
+  dest: string,
+  dump: DatabaseDump,
+  meta: { createdAt: Date; trigger: BackupTrigger; createdBy: string | null },
+): Promise<FullBackupStats> {
+  const areas = await Promise.all(
+    STORAGE_AREAS.map(async (area) => ({ area, files: await listFiles(area) })),
+  );
+  const fileCount = areas.reduce((n, a) => n + a.files.length, 0);
+  const fileBytes = areas.reduce((n, a) => n + a.files.reduce((m, f) => m + f.size, 0), 0);
+
+  const manifest = {
+    format: FULL_BACKUP_FORMAT,
+    version: 2,
+    created_at: meta.createdAt.toISOString(),
+    trigger: meta.trigger,
+    created_by: meta.createdBy,
+    source: process.env.NEXT_PUBLIC_SUPABASE_URL ?? null,
+    database: {
+      path: "database.json",
+      tables: dump.tableCount,
+      rows: dump.rowCount,
+      auth_users: dump.authUserCount,
+    },
+    files: Object.fromEntries(
+      areas.map((a) => [
+        a.area,
+        {
+          path: `files/${a.area}/`,
+          count: a.files.length,
+          bytes: a.files.reduce((m, f) => m + f.size, 0),
+        },
+      ]),
+    ),
+    restore: "npx tsx scripts/restore-backup.ts <このファイル>",
+  };
+
+  const gz = createGzip({ level: 6 });
+  const out = createWriteStream(dest);
+  const done = pipeline(gz, out);
+  const tar = new TarWriter(gz);
+  try {
+    await tar.addBuffer("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf8"), meta.createdAt);
+    await tar.addBuffer("database.json", dump.json, meta.createdAt);
+    for (const { area, files } of areas) {
+      for (const f of files) {
+        await tar.addFile(`files/${area}/${f.rel}`, f.full, f.size, f.mtime);
+      }
     }
-    return;
+    await tar.finish();
+    await done;
+  } catch (e) {
+    gz.destroy();
+    await done.catch(() => undefined);
+    throw e;
   }
-  const { error } = await admin.storage.createBucket(BACKUP_BUCKET, { public: false });
-  if (error && !/already exists/i.test(error.message)) {
-    throw new Error(`バックアップ用バケットを作成できませんでした: ${error.message}`);
-  }
+
+  const { size } = await stat(dest);
+  return { bytes: size, rawDbBytes: dump.json.length, fileCount, fileBytes };
 }
 
-export async function listBackups(admin: Admin): Promise<{ files: BackupFile[]; error: string | null }> {
-  const { data, error } = await admin.storage
-    .from(BACKUP_BUCKET)
-    .list("", { limit: 1000, sortBy: { column: "name", order: "desc" } });
-  if (error) {
-    // 初回バックアップ前はバケット自体が無い。
-    if (/not found/i.test(error.message)) return { files: [], error: null };
-    return { files: [], error: error.message };
+// ---------------------------------------------------------------------------
+// 保存先（VPS のローカル backups/ フォルダ）
+// ---------------------------------------------------------------------------
+
+export function backupDir(): string {
+  const configured = process.env.BACKUP_DIR?.trim();
+  return configured ? path.resolve(configured) : path.join(process.cwd(), BACKUP_FOLDER);
+}
+
+/** 正規のファイル名であることを確認した上で、backups/ 内の絶対パスを返す。 */
+export function backupFilePath(name: string): string {
+  if (!parseBackupFileName(name)) throw new Error("不正なファイル名です");
+  return path.join(backupDir(), name);
+}
+
+export async function listBackups(_admin?: Admin): Promise<{ files: BackupFile[]; error: string | null }> {
+  let entries: string[];
+  try {
+    entries = await readdir(backupDir());
+  } catch (e: any) {
+    // 初回バックアップ前はフォルダ自体が無い。
+    if (e?.code === "ENOENT") return { files: [], error: null };
+    return { files: [], error: errorMessage(e) };
   }
+
   const files: BackupFile[] = [];
-  for (const obj of data ?? []) {
-    const parsed = parseBackupFileName(obj.name);
+  for (const name of entries) {
+    const parsed = parseBackupFileName(name);
     if (!parsed) continue;
-    const size = Number((obj as any).metadata?.size);
-    files.push({
-      name: obj.name,
-      createdAt: parsed.createdAt.toISOString(),
-      trigger: parsed.trigger,
-      size: Number.isFinite(size) ? size : null,
-    });
+    let size: number | null = null;
+    try {
+      const s = await stat(path.join(backupDir(), name));
+      if (!s.isFile()) continue;
+      size = s.size;
+    } catch {
+      continue;
+    }
+    files.push({ name, createdAt: parsed.createdAt.toISOString(), trigger: parsed.trigger, size });
   }
+
   files.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return { files, error: null };
 }
 
-export async function createBackupDownloadUrl(admin: Admin, name: string): Promise<string> {
-  if (!parseBackupFileName(name)) throw new Error("不正なファイル名です");
-  const { data, error } = await admin.storage
-    .from(BACKUP_BUCKET)
-    .createSignedUrl(name, 60, { download: name });
-  if (error || !data?.signedUrl) {
-    throw new Error(error?.message ?? "ダウンロードURLを発行できませんでした");
+export async function deleteBackup(_admin: Admin | null, name: string): Promise<void> {
+  try {
+    await unlink(backupFilePath(name));
+  } catch (e: any) {
+    if (e?.code !== "ENOENT") throw e;
   }
-  return data.signedUrl;
 }
 
-export async function deleteBackup(admin: Admin, name: string): Promise<void> {
-  if (!parseBackupFileName(name)) throw new Error("不正なファイル名です");
-  const { error } = await admin.storage.from(BACKUP_BUCKET).remove([name]);
-  if (error) throw new Error(error.message);
-}
-
-async function pruneScheduledBackups(admin: Admin, retention: number): Promise<string[]> {
-  const { files, error } = await listBackups(admin);
+async function pruneScheduledBackups(retention: number): Promise<string[]> {
+  const { files, error } = await listBackups();
   if (error) throw new Error(error);
   const expired = selectExpiredBackups(
     files.map((f) => f.name),
     retention,
   );
-  if (expired.length === 0) return [];
-  const { error: rmErr } = await admin.storage.from(BACKUP_BUCKET).remove(expired);
-  if (rmErr) throw new Error(rmErr.message);
+  for (const name of expired) await deleteBackup(null, name);
   return expired;
 }
 
@@ -552,7 +629,8 @@ async function pruneScheduledBackups(admin: Admin, retention: number): Promise<s
 // ---------------------------------------------------------------------------
 
 /**
- * バックアップを 1 回実行して Storage に保存し、結果を app_settings と監査ログに記録する。
+ * バックアップを 1 回実行して VPS の backups/ に 1 ファイル（.tar.gz）保存し、
+ * 結果を app_settings と監査ログに記録する。
  * 失敗しても例外は投げず { ok: false } を返す（呼び出し側で HTTP ステータスを決める）。
  */
 export async function runBackup(
@@ -570,24 +648,30 @@ export async function runBackup(
   let result: BackupRunResult;
 
   try {
-    await ensureBucket(admin);
-    const archive = await buildBackupArchive(admin, {
-      createdAt: startedAt,
-      trigger: opts.trigger,
-      createdBy: opts.actorEmail ?? null,
-    });
+    const meta = { createdAt: startedAt, trigger: opts.trigger, createdBy: opts.actorEmail ?? null };
+    const dump = await buildDatabaseDump(admin, meta);
 
     const file = backupFileName(startedAt, opts.trigger);
-    const { error: upErr } = await admin.storage
-      .from(BACKUP_BUCKET)
-      .upload(file, archive.gz, { contentType: "application/gzip", upsert: false });
-    if (upErr) throw new Error(`バックアップファイルの保存に失敗しました: ${upErr.message}`);
+    const dest = backupFilePath(file);
+    await mkdir(path.dirname(dest), { recursive: true });
+    // 書き込み途中のファイルが一覧に出ないよう、別名で書いてから置き換える
+    // （自動は同日 1 ファイルのため再試行時は上書き）。
+    const partial = `${dest}.partial`;
+    let stats: FullBackupStats;
+    try {
+      stats = await writeFullBackup(partial, dump, meta);
+      await rename(partial, dest);
+    } catch (e) {
+      await unlink(partial).catch(() => undefined);
+      throw new Error(`バックアップファイルの保存に失敗しました: ${errorMessage(e)}`);
+    }
 
-    const warnings = [...archive.warnings];
+    const warnings = [...dump.warnings];
+
     let pruned: string[] = [];
     if (opts.trigger === "scheduled" && opts.retention) {
       try {
-        pruned = await pruneScheduledBackups(admin, opts.retention);
+        pruned = await pruneScheduledBackups(opts.retention);
       } catch (e) {
         // 古い世代の削除失敗でバックアップ自体を失敗扱いにはしない。
         warnings.push(`古いバックアップの削除に失敗しました: ${errorMessage(e)}`);
@@ -597,11 +681,13 @@ export async function runBackup(
     result = {
       ok: true,
       file,
-      bytes: archive.gz.length,
-      rawBytes: archive.rawBytes,
-      tableCount: archive.tableCount,
-      rowCount: archive.rowCount,
-      authUserCount: archive.authUserCount,
+      bytes: stats.bytes,
+      rawBytes: stats.rawDbBytes,
+      tableCount: dump.tableCount,
+      rowCount: dump.rowCount,
+      authUserCount: dump.authUserCount,
+      fileCount: stats.fileCount,
+      fileBytes: stats.fileBytes,
       durationMs: Date.now() - startedAt.getTime(),
       warnings,
       pruned,
@@ -620,6 +706,8 @@ export async function runBackup(
         rows: result.rowCount,
         tables: result.tableCount,
         auth_users: result.authUserCount,
+        files: result.fileCount,
+        file_bytes: result.fileBytes,
         duration_ms: result.durationMs,
         warnings: result.warnings,
       }
@@ -640,7 +728,7 @@ export async function runBackup(
     actorId,
     action: result.ok ? "backup.run" : "backup.run_failed",
     // audit_logs.target_id は uuid 型のため、ファイル名は meta に入れる。
-    targetTable: "storage:" + BACKUP_BUCKET,
+    targetTable: BACKUP_TARGET,
     meta: {
       trigger: opts.trigger,
       ...(result.ok
@@ -650,6 +738,8 @@ export async function runBackup(
             rows: result.rowCount,
             tables: result.tableCount,
             auth_users: result.authUserCount,
+            files: result.fileCount,
+            file_bytes: result.fileBytes,
             pruned: result.pruned,
             warnings: result.warnings,
           }

@@ -1,0 +1,137 @@
+/*
+ * 会員コミュニティ（Retouch チャット）の配色・動き。
+ * .sk-app（コミュニティ画面のルート）の内側だけに効かせ、サイトの他の画面には影響させない。
+ * 既存コンポーネントが使う sk-* の色クラスもここで Retouch の配色に置き換える。
+ */
+
+.sk-app {
+  --rc-bg: #edf2ee;
+  --rc-panel: #ffffff;
+  --rc-side: #f6f9f7;
+  --rc-text: #1e2b24;
+  --rc-mute: #66756c;
+  --rc-line: #e2e9e4;
+  --rc-soft: #f1f5f2;
+  --rc-accent: #2d6a4f;
+  --rc-accent-hover: #22553f;
+  --rc-accent-soft: #e3f0e8;
+  --rc-link: #1f7a57;
+  --rc-badge: #e0782f;
+  --rc-warn-bg: #fff6e5;
+  --rc-red: #d2475e;
+  --rc-shadow: 0 1px 2px rgba(30, 43, 36, 0.06), 0 8px 24px rgba(30, 43, 36, 0.06);
+  background: var(--rc-bg);
+  color: var(--rc-text);
+}
+div.sk-app {
+  font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, system-ui, sans-serif;
+}
+
+/* ---- sk-* の色クラスを Retouch の配色へ ---- */
+.sk-app .text-sk-text,
+.sk-app .hover\:text-sk-text:hover { color: var(--rc-text); }
+.sk-app .text-sk-mute { color: var(--rc-mute); }
+.sk-app .text-sk-link { color: var(--rc-link); }
+.sk-app .text-sk-green { color: var(--rc-accent); }
+.sk-app .text-sk-red { color: var(--rc-red); }
+.sk-app .text-sk-side { color: var(--rc-accent); }
+
+.sk-app .bg-sk-soft,
+.sk-app .hover\:bg-sk-soft:hover,
+.sk-app .hover\:bg-sk-hover:hover { background-color: var(--rc-soft); }
+.sk-app .bg-sk-yellow { background-color: var(--rc-warn-bg); }
+.sk-app .bg-sk-green,
+.sk-app .bg-sk-active,
+.sk-app .bg-sk-side,
+.sk-app .bg-sk-frame { background-color: var(--rc-accent); }
+.sk-app .hover\:bg-sk-greenhover:hover { background-color: var(--rc-accent-hover); }
+.sk-app .hover\:bg-sk-active:hover { background-color: var(--rc-accent-soft); color: var(--rc-accent-hover); }
+.sk-app .bg-sk-text { background-color: var(--rc-text); }
+.sk-app .bg-sk-presence { background-color: #1fa35b; }
+.sk-app .bg-sk-badge { background-color: var(--rc-badge); }
+
+.sk-app .border-sk-line,
+.sk-app .hover\:border-sk-line:hover,
+.sk-app .md\:border-sk-line,
+.sk-app .lg\:border-sk-line { border-color: var(--rc-line); }
+.sk-app .divide-sk-line > * + * { border-color: var(--rc-line); }
+.sk-app .border-sk-text { border-color: var(--rc-accent); }
+.sk-app .border-sk-mute { border-color: var(--rc-mute); }
+.sk-app .border-sk-link,
+.sk-app .border-sk-green { border-color: var(--rc-accent); }
+.sk-app .border-sk-red { border-color: var(--rc-red); }
+.sk-app .border-sk-side,
+.sk-app .border-sk-frame { border-color: var(--rc-side); }
+
+/* ---- パネル ---- */
+.rc-panel {
+  background: var(--rc-panel);
+  border: 1px solid var(--rc-line);
+  box-shadow: var(--rc-shadow);
+}
+
+/* ---- スクロールバー（明るい面の上） ---- */
+.sk-app .sk-scroll,
+.sk-app .sk-scroll-light {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45, 106, 79, 0.28) transparent;
+}
+.sk-app .sk-scroll::-webkit-scrollbar,
+.sk-app .sk-scroll-light::-webkit-scrollbar { width: 8px; }
+.sk-app .sk-scroll::-webkit-scrollbar-thumb,
+.sk-app .sk-scroll-light::-webkit-scrollbar-thumb {
+  background: rgba(45, 106, 79, 0.28);
+  border-radius: 999px;
+}
+
+/* ---- キーボード操作時のフォーカス ---- */
+.sk-app :where(button, a, [role="tab"], [role="menuitem"]):focus-visible {
+  outline: 2px solid var(--rc-accent);
+  outline-offset: 2px;
+}
+
+/* ---- 動き ---- */
+@keyframes rc-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rc-pop {
+  from { opacity: 0; transform: scale(0.94) translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rc-slide-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rc-backdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rc-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(224, 120, 47, 0.45); }
+  70% { box-shadow: 0 0 0 6px rgba(224, 120, 47, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(224, 120, 47, 0); }
+}
+
+.rc-anim-fade-up { animation: rc-fade-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.rc-anim-pop { animation: rc-pop 0.16s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: top right; }
+.rc-anim-slide-in { animation: rc-slide-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.rc-anim-backdrop { animation: rc-backdrop 0.18s ease-out both; }
+.rc-badge-pulse { animation: rc-pulse-ring 1.8s ease-out 2; }
+
+/* メニュー・ポップアップは開くときに軽く拡大 */
+.sk-app [role="menu"],
+.sk-app [role="listbox"] { animation: rc-pop 0.14s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* 新着メッセージはふわっと表示 */
+.sk-app .rc-msg { animation: rc-fade-up 0.22s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-app *,
+  .sk-app *::before,
+  .sk-app *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

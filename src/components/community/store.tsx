@@ -21,7 +21,8 @@ import {
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import * as api from "@/lib/community/api";
-import { COMMUNITY_BUCKET, MESSAGE_MAX_LENGTH, type NotifyLevel } from "@/lib/community/constants";
+import { COMMUNITY_READ_EVENT } from "./useCommunityNavBadge";
+import { MESSAGE_MAX_LENGTH, type NotifyLevel } from "@/lib/community/constants";
 import {
   badgeCount,
   encodeMentions,
@@ -95,6 +96,10 @@ export type State = {
   receipts: Record<string, string>;
   typing: Record<string, Record<string, number>>;
   online: Set<string>;
+  /** online のうち離席中（画面を見ていない・5分以上操作なし）の人 */
+  away: Set<string>;
+  /** 自分の在席状態の表示（手動の切り替え） */
+  presenceMode: PresenceMode;
   signed: Record<string, string>;
   toasts: Toast[];
   notificationPermission: NotificationPermission | "unsupported";
@@ -187,6 +192,31 @@ export const useUser = (id: string | null | undefined) => useCS((s) => (id ? s.u
 export const useName = (id: string | null | undefined) => useCS((s) => displayName(s, id));
 export const useOnline = (id: string | null | undefined) => useCS((s) => (id ? s.online.has(id) : false));
 
+/** 在席状態: active = アクティブ / away = 離席中 / offline = オフライン */
+export type Presence = "active" | "away" | "offline";
+export const PRESENCE_LABEL: Record<Presence, string> = {
+  active: "アクティブ",
+  away: "離席中",
+  offline: "オフライン",
+};
+/**
+ * 自分の在席状態の表示方法（手動の切り替え）
+ *   auto: 画面の表示・操作から自動で「アクティブ / 離席中」
+ *   away: 常に「離席中」
+ *   invisible: 他の人には「オフライン」と表示（コミュニティは通常どおり使える）
+ */
+export type PresenceMode = "auto" | "away" | "invisible";
+export const PRESENCE_MODE_LABEL: Record<PresenceMode, string> = {
+  auto: "自動（アクティブ／離席中）",
+  away: "離席中にする",
+  invisible: "オフラインとして表示",
+};
+const PRESENCE_MODE_KEY = "community:presence-mode";
+export const usePresenceMode = () => useCS((s) => s.presenceMode);
+
+export const usePresence = (id: string | null | undefined): Presence =>
+  useCS((s) => (!id || !s.online.has(id) ? "offline" : s.away.has(id) ? "away" : "active"));
+
 /** 表示名を返す関数（ユーザー情報が変わると新しい関数になる）。一覧・モーダル向け。 */
 export function useNameOf(): (id: string | null | undefined) => string {
   const users = useCS((s) => s.users);
@@ -273,6 +303,8 @@ export function initialState(init: InitPayload, explicitChannel: boolean): State
     receipts: {},
     typing: {},
     online: new Set(),
+    away: new Set(),
+    presenceMode: "auto",
     signed: {},
     toasts: [],
     notificationPermission: "unsupported",
@@ -420,13 +452,23 @@ function createActions(store: Store, db: Db) {
   const patchChannel = (id: string, patch: Partial<ChannelRow>) =>
     set((s) => ({ channels: s.channels.map((c) => (c.id === id ? { ...c, ...patch } : c)) }));
 
+  // 「未読にする」を使ったチャンネル。離れるまで自動で既読にしない。
+  const unreadHold = new Set<string>();
+
+  /** サイトのヘッダーの未読数（useCommunityNavBadge）に、既読・未読が変わったことを知らせる */
+  const notifyReadChanged = () => {
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(COMMUNITY_READ_EVENT));
+  };
+
   const doMarkRead = async (id: string) => {
+    if (unreadHold.has(id)) return;
     const ch = channelOf(id);
     if (!ch) return;
     if (ch.unread_count > 0 || ch.mention_count > 0) patchChannel(id, { unread_count: 0, mention_count: 0 });
     try {
       const at = await api.markRead(db, id);
       patchChannel(id, { last_read_at: at });
+      notifyReadChanged();
     } catch {
       // 既読の記録に失敗しても表示上は既読扱いのまま（次回の一覧更新で正しい値に戻る）
     }
@@ -581,6 +623,8 @@ function createActions(store: Store, db: Db) {
   };
 
   const openChannel = (id: string | null) => {
+    // チャンネルを開き直したら通常どおり既読にする
+    unreadHold.clear();
     if (!id) {
       set({ currentId: null, mobileView: "list" });
       setUrlChannel(null);
@@ -900,7 +944,7 @@ function createActions(store: Store, db: Db) {
       return true;
     } catch (e) {
       stripTemp();
-      if (uploaded.length > 0) await db.storage.from(COMMUNITY_BUCKET).remove(uploaded).catch(() => undefined);
+      if (uploaded.length > 0) await api.removeAttachments(uploaded);
       fail(e, "メッセージを送信できませんでした。");
       return false;
     }
@@ -968,6 +1012,32 @@ function createActions(store: Store, db: Db) {
       pushToast({ kind: "info", title: updated.is_pinned ? "ピン留めしました。" : "ピン留めを外しました。" });
     } catch (e) {
       fail(e, "ピン留めできませんでした。");
+    }
+  };
+
+  /** 「未読にする」: そのメッセージ以降を未読に戻す（このチャンネルを離れるまで自動で既読にしない） */
+  const markUnread = async (msg: Message) => {
+    const channelId = msg.channel_id;
+    try {
+      const at = await api.markUnread(db, msg.id);
+      unreadHold.add(channelId);
+      const since = Date.parse(at);
+      const myId = get().me.id;
+      const count = (get().messages[channelId]?.items ?? []).filter(
+        (m) => !m.parent_id && !m.deleted_at && m.user_id !== myId && Date.parse(m.created_at) > since,
+      ).length;
+      patchChannel(channelId, { last_read_at: at, unread_count: count });
+      set((s) => ({ dividerAt: { ...s.dividerAt, [channelId]: at } }));
+      pushToast({ kind: "info", title: "未読にしました。" });
+      scheduleRefreshChannels();
+      notifyReadChanged();
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      if (/community_mark_unread|schema cache|Could not find the function/i.test(m)) {
+        pushToast({ kind: "error", title: "「未読にする」は準備中です。", body: "データベースの更新後にご利用いただけます。" });
+      } else {
+        fail(e, "未読にできませんでした。");
+      }
     }
   };
 
@@ -1053,6 +1123,26 @@ function createActions(store: Store, db: Db) {
     } catch (e) {
       fail(e, "チャンネルを作成できませんでした。");
       return null;
+    }
+  };
+
+  /** チャンネルのアイコンを設定する（null で外す）。成功したら true。 */
+  const setChannelIcon = async (
+    channelId: string,
+    input: { file: File } | { emoji: string } | null,
+  ): Promise<boolean> => {
+    try {
+      if (input) {
+        const icon = await api.setChannelIcon(channelId, input);
+        patchChannel(channelId, { icon });
+      } else {
+        await api.clearChannelIcon(channelId);
+        patchChannel(channelId, { icon: null });
+      }
+      return true;
+    } catch (e) {
+      fail(e, "アイコンを変更できませんでした。");
+      return false;
     }
   };
 
@@ -1191,6 +1281,40 @@ function createActions(store: Store, db: Db) {
     }
   };
 
+  /**
+   * アイコン写真を変更する。マイページの写真と同じもの（customers.avatar_url）を更新し、
+   * コミュニティのアイコンにも同時に反映される（/api/mypage/avatar）。
+   */
+  const uploadAvatar = async (file: File): Promise<boolean> => {
+    const fd = new FormData();
+    fd.append("avatar", file);
+    try {
+      const res = await fetch("/api/mypage/avatar", { method: "POST", body: fd, credentials: "same-origin" });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || typeof j?.avatar_url !== "string") throw new Error(j?.error ?? "写真を変更できませんでした。");
+      const url = j.avatar_url as string;
+      set((s) => ({
+        me: { ...s.me, profile: s.me.profile ? { ...s.me.profile, avatar_url: url } : s.me.profile },
+        users: s.users[s.me.id] ? { ...s.users, [s.me.id]: { ...s.users[s.me.id], avatar_url: url } } : s.users,
+      }));
+      pushToast({ kind: "info", title: "写真を変更しました。" });
+      return true;
+    } catch (e) {
+      fail(e, "写真を変更できませんでした。");
+      return false;
+    }
+  };
+
+  /** 在席状態の表示（自動 / 離席中 / オフラインとして表示）。この端末のブラウザに記憶する。 */
+  const setPresenceMode = (mode: PresenceMode) => {
+    set({ presenceMode: mode });
+    try {
+      window.localStorage.setItem(PRESENCE_MODE_KEY, mode);
+    } catch {
+      // 記憶できなくても今回の表示は切り替わる
+    }
+  };
+
   /** 既読のメンバー（チャンネルの「既読 N」を押したとき） */
   const readersOf = (msg: Message): string[] => {
     const created = Date.parse(msg.created_at);
@@ -1236,6 +1360,8 @@ function createActions(store: Store, db: Db) {
     remove,
     react,
     pin,
+    markUnread,
+    setChannelIcon,
     report,
     join,
     leave,
@@ -1251,6 +1377,8 @@ function createActions(store: Store, db: Db) {
     loadActivity,
     markActivitySeen,
     saveProfile,
+    uploadAvatar,
+    setPresenceMode,
   };
 }
 
@@ -1415,27 +1543,91 @@ export function CommunityProvider({
     return () => clearInterval(t);
   }, [actions, hasTyping]);
 
-  // ---------------------------------------------------------------- realtime: presence (online)
+  // 手動で選んだ在席状態の表示を復元する（この端末のブラウザに記憶）
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(PRESENCE_MODE_KEY);
+      if (saved === "away" || saved === "invisible") store.set({ presenceMode: saved });
+    } catch {
+      // 既定（自動）のまま
+    }
+  }, [store]);
+  const presenceMode = useSyncExternalStore(
+    store.subscribe,
+    () => store.get().presenceMode,
+    () => "auto" as PresenceMode,
+  );
+
+  // ---------------------------------------------------------------- realtime: presence（アクティブ / 離席中 / オフライン）
   useEffect(() => {
     const db = actions.db;
     const channel = db.channel("community:presence", {
       config: { private: true, presence: { key: meId } },
     });
+    // 画面を見ていない、または 5 分以上操作が無ければ「離席中」として共有する
+    const IDLE_MS = 5 * 60 * 1000;
+    let lastInput = Date.now();
+    let subscribed = false;
+    const compute = (): "active" | "away" =>
+      presenceMode === "away"
+        ? "away"
+        : document.visibilityState === "visible" && Date.now() - lastInput < IDLE_MS
+          ? "active"
+          : "away";
+    let status = compute();
+    // 「オフラインとして表示」のときは自分の在席を共有しない（他の人の在席は受け取る）
+    const track = () => {
+      if (presenceMode === "invisible") return;
+      void channel.track({ online_at: new Date().toISOString(), status });
+    };
+    const refresh = () => {
+      const next = compute();
+      if (next === status) return;
+      status = next;
+      if (subscribed) track();
+    };
+    const onInput = () => {
+      lastInput = Date.now();
+      if (status !== "active") refresh();
+    };
+    const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && Array.from(b).every((id) => a.has(id));
+
     channel
       .on("presence", { event: "sync" }, () => {
-        const next = new Set(Object.keys(channel.presenceState()));
-        store.set((s) =>
-          s.online.size === next.size && Array.from(next).every((id) => s.online.has(id)) ? null : { online: next },
-        );
+        const state = channel.presenceState() as Record<string, Array<{ status?: string }>>;
+        const online = new Set<string>();
+        const away = new Set<string>();
+        for (const [id, metas] of Object.entries(state)) {
+          online.add(id);
+          // 複数タブのうち 1 つでもアクティブならアクティブ（status の無い古い画面はアクティブ扱い）
+          if (metas.length > 0 && metas.every((m) => m.status === "away")) away.add(id);
+        }
+        store.set((s) => {
+          const patch: Partial<State> = {};
+          if (!sameSet(s.online, online)) patch.online = online;
+          if (!sameSet(s.away, away)) patch.away = away;
+          return Object.keys(patch).length > 0 ? patch : null;
+        });
       })
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") void channel.track({ online_at: new Date().toISOString() });
-        if (status === "CHANNEL_ERROR") void db.removeChannel(channel);
+      .subscribe((st) => {
+        if (st === "SUBSCRIBED") {
+          subscribed = true;
+          track();
+        }
+        if (st === "CHANNEL_ERROR") void db.removeChannel(channel);
       });
+
+    const inputEvents = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart", "focus"] as const;
+    inputEvents.forEach((ev) => window.addEventListener(ev, onInput, { passive: true }));
+    document.addEventListener("visibilitychange", refresh);
+    const timer = setInterval(refresh, 30 * 1000);
     return () => {
+      inputEvents.forEach((ev) => window.removeEventListener(ev, onInput));
+      document.removeEventListener("visibilitychange", refresh);
+      clearInterval(timer);
       void db.removeChannel(channel);
     };
-  }, [actions, store, meId]);
+  }, [actions, store, meId, presenceMode]);
 
   // ---------------------------------------------------------------- signed URL refresh
   useEffect(() => {

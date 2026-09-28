@@ -26,6 +26,8 @@ html {
      position:sticky header pins reliably. */
   overflow-x: clip;
   scroll-behavior: smooth;
+  /* sticky ヘッダー（約 73px）分だけアンカー位置を下げ、先頭コンテンツが隠れないようにする */
+  scroll-padding-top: 88px;
 }
 
 body {

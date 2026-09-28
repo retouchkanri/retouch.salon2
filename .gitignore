@@ -24,6 +24,10 @@ horseimage.zip
 supabase/*.csv
 supabase/*.xlsx
 supabase/backups/
+backups/db-backup_*.json.gz
+backups/db-backup_*.tar.gz
+# Uploaded files stored on the VPS (avatars, horse/news images, PDFs, chat attachments)
+storage/
 
 # Editor / OS / stray git
 .git2/

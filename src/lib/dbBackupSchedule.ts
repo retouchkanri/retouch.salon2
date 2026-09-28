@@ -136,24 +136,71 @@ export function decideScheduledRun(
 }
 
 // ---------------------------------------------------------------------------
-// バックアップファイル名
-//   db-backup_2026-09-25T18-00-12-345Z_scheduled.json.gz
-// 名前だけで作成日時と種別がわかるようにし、Storage の一覧から直接表示・世代管理する。
+// バックアップファイル名（VPS のローカル backups/ 配下に置く）
+//   自動: db-backup_2026-09-26_scheduled.tar.gz  （日本時間の日付ごと 1 ファイル）
+//   手動: db-backup_2026-09-25T18-00-12-345Z_manual.tar.gz
+// .tar.gz は DB とアップロードファイル一式をまとめたフルバックアップ。
+// .json.gz は旧形式（DB のみ）で、一覧・ダウンロード・世代管理・復元の対象として引き続き扱う。
+// 名前だけで作成日時と種別がわかるようにし、一覧・世代管理に使う。
 // ---------------------------------------------------------------------------
 
-const NAME_RE =
-  /^db-backup_(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z_(manual|scheduled)\.json\.gz$/;
+/** VPS のローカル FS 上のバックアップ格納フォルダ名。 */
+export const BACKUP_FOLDER = "backups";
 
-export function backupFileName(at: Date, trigger: BackupTrigger): string {
-  const stamp = at.toISOString().replace(/[:.]/g, "-");
-  return `db-backup_${stamp}_${trigger}.json.gz`;
+const TIMESTAMP_NAME_RE =
+  /^db-backup_(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z_(manual|scheduled)\.(?:tar|json)\.gz$/;
+/** 自動バックアップ用。1 日（日本時間）あたり 1 ファイル。 */
+const DAILY_SCHEDULED_NAME_RE = /^db-backup_(\d{4}-\d{2}-\d{2})_scheduled\.(?:tar|json)\.gz$/;
+
+/** `at` の日本時間カレンダー日を YYYY-MM-DD で返す。 */
+export function jstCalendarDate(at: Date): string {
+  const jst = new Date(at.getTime() + JST_OFFSET_MS);
+  const y = jst.getUTCFullYear();
+  const m = String(jst.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(jst.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-/** 正規のバックアップファイル名なら作成日時と種別を返す。それ以外（パス区切り等を含む）は null。 */
+/**
+ * バックアップのファイル名（フォルダなしの basename）。
+ * 自動は日付単位で固定し、同日の再試行は同じファイルを上書きする。
+ */
+export function backupFileName(at: Date, trigger: BackupTrigger): string {
+  if (trigger === "scheduled") {
+    return `db-backup_${jstCalendarDate(at)}_scheduled.tar.gz`;
+  }
+  const stamp = at.toISOString().replace(/[:.]/g, "-");
+  return `db-backup_${stamp}_manual.tar.gz`;
+}
+
+/** 旧形式（DB のみの gzip JSON）のファイルか。 */
+export function isLegacyJsonBackup(name: string): boolean {
+  return name.endsWith(".json.gz");
+}
+
+/** ローカル上の相対パス（`backups/<basename>`）。 */
+export function backupObjectPath(name: string): string {
+  return `${BACKUP_FOLDER}/${name}`;
+}
+
+/**
+ * 正規のバックアップファイル名なら作成日時と種別を返す。
+ * パス区切りや `backups/` 以外のプレフィックスを含むものは null（パストラバーサル防止）。
+ */
 export function parseBackupFileName(
   name: string,
 ): { createdAt: Date; trigger: BackupTrigger } | null {
-  const m = NAME_RE.exec(name);
+  if (!name || name.includes("/") || name.includes("\\") || name.includes("..")) return null;
+
+  const daily = DAILY_SCHEDULED_NAME_RE.exec(name);
+  if (daily) {
+    // ファイル名の日付は日本時間の暦日。表示・並び替え用にその日 00:00 JST を返す。
+    const createdAt = new Date(`${daily[1]}T00:00:00+09:00`);
+    if (Number.isNaN(createdAt.getTime())) return null;
+    return { createdAt, trigger: "scheduled" };
+  }
+
+  const m = TIMESTAMP_NAME_RE.exec(name);
   if (!m) return null;
   const createdAt = new Date(`${m[1]}T${m[2]}:${m[3]}:${m[4]}.${m[5]}Z`);
   if (Number.isNaN(createdAt.getTime())) return null;

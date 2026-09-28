@@ -41,7 +41,8 @@ export default function CommunityNavLink({
     }
   }, [inCommunity]);
 
-  const summary = useCommunityNavBadge(inCommunity ? undefined : onBump, !inCommunity);
+  // コミュニティ画面を開いている間も未読数は表示する（ポップアップはコミュニティ外のみ）
+  const summary = useCommunityNavBadge(inCommunity ? undefined : onBump, true);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -57,21 +58,20 @@ export default function CommunityNavLink({
   if (variant === "header" && viewport === "mobile") return null;
   if (variant === "fab" && viewport === "desktop") return null;
 
-  const badge = inCommunity ? 0 : summary?.badge ?? 0;
-  const dot = !inCommunity && !badge && !!summary?.has_unread;
+  // 他の人から届いた未読メッセージの数（ミュートしたチャンネルは除く）
+  const badge = summary?.unread_total ?? 0;
   const label = badge > 0 ? `コミュニティ（未読 ${badge} 件）` : "コミュニティ";
   const attn = !inCommunity ? "community-nav-attn" : "";
 
-  const badgeEl = (
-    <>
-      {badge > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center tabular-nums leading-none">
-          {badge > 99 ? "99+" : badge}
-        </span>
-      )}
-      {dot && <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-rose-500" aria-hidden />}
-    </>
-  );
+  const badgeEl =
+    badge > 0 ? (
+      <span
+        className="absolute -top-1 -right-1 flex h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#E5484D] px-1.5 text-[11px] font-bold leading-none text-white tabular-nums shadow-[0_0_0_2px_#fff]"
+        aria-hidden
+      >
+        {badge > 99 ? "99+" : badge}
+      </span>
+    ) : null;
 
   const link =
     variant === "fab" ? (

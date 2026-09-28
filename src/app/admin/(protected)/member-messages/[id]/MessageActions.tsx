@@ -9,11 +9,16 @@ export default function MessageActions({
   status,
   failedCount = 0,
   pendingCount = 0,
+  /** アクティブ会員数より配信先が少ないとき（取りこぼしの可能性） */
+  audienceGap = 0,
+  recipientCount = 0,
 }: {
   id: string;
   status: string;
   failedCount?: number;
   pendingCount?: number;
+  audienceGap?: number;
+  recipientCount?: number;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -52,12 +57,14 @@ export default function MessageActions({
     router.refresh();
   };
 
-  const send = async () => {
+  const send = async (opts?: { fillGaps?: boolean }) => {
     if (
       !confirm(
-        status === "sending" || pendingCount > 0
-          ? "未送信分の配信を続けますか？"
-          : "今すぐ配信しますか？（件数の上限はありません。完了まで自動的に配信を続けます）",
+        opts?.fillGaps
+          ? `配信対象に含まれていない会員（推定 ${audienceGap.toLocaleString("ja-JP")} 名）を追加して送信します。よろしいですか？\n（送信済みの方には再送されません）`
+          : status === "sending" || pendingCount > 0
+            ? "未送信分の配信を続けますか？"
+            : "今すぐ配信しますか？（件数の上限はありません。完了まで自動的に配信を続けます）",
       )
     )
       return;
@@ -114,16 +121,35 @@ export default function MessageActions({
     router.push("/admin/member-messages");
   };
 
+  const showContinue = (status !== "sent" && status !== "canceled") || pendingCount > 0;
+
   return (
     <div className="space-y-2">
+      {audienceGap > 0 && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+          アクティブ会員より配信先が {audienceGap.toLocaleString("ja-JP")} 名少ないです（配信先{" "}
+          {recipientCount.toLocaleString("ja-JP")} 名）。取りこぼしの可能性があるため、不足分の追加送信を推奨します。
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
-        {((status !== "sent" && status !== "canceled") || pendingCount > 0) && (
-          <button className="btn-primary" disabled={busy} onClick={send}>
+        {showContinue && (
+          <button className="btn-primary" disabled={busy} onClick={() => send()}>
             {busy
               ? "配信中…"
               : status === "sending" || pendingCount > 0
                 ? "配信を続ける"
                 : "今すぐ配信（全件・件数無制限）"}
+          </button>
+        )}
+        {audienceGap > 0 && status !== "canceled" && status !== "draft" && (
+          <button className="btn-primary" disabled={busy} onClick={() => send({ fillGaps: true })}>
+            {busy ? "配信中…" : `不足分を追加して送信（約 ${audienceGap.toLocaleString("ja-JP")} 名）`}
+          </button>
+        )}
+        {/* 配信済でも漏れ確認のため再実行できる（送信済みには再送されない） */}
+        {status === "sent" && audienceGap <= 0 && pendingCount === 0 && (
+          <button className="btn-secondary" disabled={busy} onClick={() => send({ fillGaps: true })}>
+            {busy ? "確認中…" : "対象者の漏れを確認して追加送信"}
           </button>
         )}
         {failedCount > 0 && (status === "sent" || status === "sending") && (
@@ -137,7 +163,7 @@ export default function MessageActions({
       </div>
       {/* 送信完了後もバーを残し、最終的な到達件数が確認できるようにする。 */}
       {progress && <SendProgressBar progress={progress} done={!busy} />}
-      {msg && <p className="text-sm">{msg}</p>}
+      {msg && <p className="text-sm whitespace-pre-wrap">{msg}</p>}
     </div>
   );
 }

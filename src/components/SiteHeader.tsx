@@ -62,6 +62,7 @@ export default async function SiteHeader() {
               width={220}
               height={64}
               priority
+              sizes="220px"
               className="h-9 w-auto md:h-12"
             />
           </Link>

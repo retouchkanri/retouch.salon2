@@ -26,9 +26,9 @@ async function refresh(announce: boolean) {
   try {
     const s = await unreadSummary(getSupabaseBrowserClient());
     const prev = lastBadge;
-    if (s) lastBadge = s.badge;
+    if (s) lastBadge = s.unread_total;
     emit(s);
-    if (announce && s && prev != null && s.badge > prev) {
+    if (announce && s && prev != null && s.unread_total > prev) {
       bumpListeners.forEach((fn) => fn(s));
     }
   } catch {
@@ -40,6 +40,13 @@ function onFocus() {
   void refresh(true);
 }
 
+/** コミュニティ画面で既読・未読が変わったとき（store.tsx が通知する）。すぐに数え直す。 */
+export const COMMUNITY_READ_EVENT = "community:read-changed";
+function onReadChanged() {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => void refresh(false), 300);
+}
+
 function ensureStarted() {
   if (started || typeof window === "undefined") return;
   started = true;
@@ -47,6 +54,7 @@ function ensureStarted() {
 
   pollTimer = setInterval(() => void refresh(true), 60_000);
   window.addEventListener("focus", onFocus);
+  window.addEventListener(COMMUNITY_READ_EVENT, onReadChanged);
 
   const db = getSupabaseBrowserClient();
   channel = db
@@ -66,6 +74,7 @@ function stopIfIdle() {
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = null;
   window.removeEventListener("focus", onFocus);
+  window.removeEventListener(COMMUNITY_READ_EVENT, onReadChanged);
   if (channel) {
     void getSupabaseBrowserClient().removeChannel(channel);
     channel = null;
@@ -75,7 +84,7 @@ function stopIfIdle() {
 /**
  * ヘッダー／FAB で共有するコミュニティ未読。
  * 利用不可（対象外）のときは null。Realtime／ポーリングは1本だけ。
- * enabled=false（コミュニティ画面を開いている間）は購読しない（画面側が未読を管理するため）。
+ * enabled=false のときは購読しない。
  */
 export function useCommunityNavBadge(onBump?: (s: UnreadSummary) => void, enabled = true): UnreadSummary | null {
   const [summary, setSummary] = useState<UnreadSummary | null>(cached);

@@ -160,3 +160,48 @@ scripts/                        ── 管理者作成・サンプル投入
 - 支援・決済状態の同期は Stripe Webhook 経由。本番公開前に Webhook シークレットを必ず設定してください。
 - 既存 600 名の会員データ移行は、`管理データー【管理厳重】.xlsx` を CSV エクスポートし、`/admin/csv` から段階的に投入します（項目対応：氏名→`full_name`、メール→`email`、住所→`address1/2` など）。
 - RLS により、会員は自分の `customer_id` のレコードのみ参照・編集できます。運営は `profiles.role = 'admin' | 'staff'`。
+
+## アップロードファイルの保存先（VPS）
+
+ファイル本体はすべて VPS のディスクに保存し、Supabase の DB にはパスだけを保存します（`src/lib/fileStorage.ts`）。
+
+| 種類 | 保存先 | DB に保存する値 | 配信 |
+| --- | --- | --- | --- |
+| 会員アバター・馬画像・お知らせ／会員向けメッセージの画像・PDF | `storage/public/<path>` | `/uploads/<path>` | `/uploads/<path>`（公開） |
+| コミュニティ（チャット）の添付ファイル | `storage/community/<channel>/<user>/<file>` | `<channel>/<user>/<file>`（`community_messages.attachments`） | `/api/community/files/<path>`（そのチャンネルを読める人のみ） |
+
+- 保存先は環境変数 `FILE_STORAGE_DIR` で変更できます（既定はプロジェクト直下の `storage/`。Git 管理外）。
+- メール配信では `/uploads/...` を `NEXT_PUBLIC_SITE_URL` 付きの絶対 URL に変換して送ります。
+- 旧構成（Supabase Storage）からの移行: `npx tsx scripts/migrate-storage-to-vps.ts` でファイルを取得し DB の書き換え予定を確認、
+  `--apply` を付けると DB 内の旧 URL を `/uploads/...` に書き換えます（元の値は `backups/storage-migration_*.json` に保存）。
+  チャットの添付は、VPS に無い場合に表示時に旧 Storage から自動で取り込みます。
+
+## バックアップと復元
+
+管理画面「DBバックアップ」（または `npx tsx scripts/backup-now.ts`）で、次をすべて 1 つにまとめた
+`backups/db-backup_<日時>_<manual|scheduled>.tar.gz` を作成します。
+
+- `manifest.json` … 形式・作成日時・件数
+- `database.json` … DB の全テーブル＋認証ユーザー（パスワードは含まれません）
+- `files/public/...`・`files/community/...` … `storage/` 配下のアップロードファイル一式
+
+標準的な tar 形式なので、Windows の `tar -xzf`・7-Zip でも展開できます。サーバー障害に備え、定期的にダウンロードして別の場所にも保管してください。
+VPS では Vercel Cron が動かないため、自動バックアップはタスク スケジューラから
+`npx tsx scripts/backup-now.ts --scheduled`（作業フォルダ＝プロジェクト直下）を毎日実行して行います。
+
+復元（プロジェクト直下で。接続先は `.env.local` の Supabase）:
+
+```bash
+# 1. 内容の確認（何も変更しない）
+npx tsx scripts/restore-backup.ts backups/<ファイル名>.tar.gz
+# 2. ファイルと DB の両方を復元（主キーで upsert。同じ行は上書き、バックアップに無い行は残る）
+npx tsx scripts/restore-backup.ts backups/<ファイル名>.tar.gz --apply
+#    ファイルだけ / DB だけ / 特定テーブルだけ
+npx tsx scripts/restore-backup.ts backups/<ファイル名>.tar.gz --apply --files-only
+npx tsx scripts/restore-backup.ts backups/<ファイル名>.tar.gz --apply --db-only --tables=news,horses
+```
+
+- 新しい Supabase プロジェクトへ復元する場合は、先に「2. Supabase のスキーマ適用」でスキーマを作成してから実行します。
+- 認証ユーザーは同じ ID で再作成されますが、パスワードは含まれないため、各会員は「パスワードを忘れた方」から再設定が必要です
+  （既存の Supabase プロジェクトへ復元する場合、既に存在するユーザーはそのまま使われます）。
+- 旧形式の `.json.gz`（DB のみ）も同じコマンドで復元できます。

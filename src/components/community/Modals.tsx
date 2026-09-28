@@ -23,18 +23,19 @@ import {
   sortChannels,
 } from "@/lib/community/text";
 import type { ChannelRow, Message, SearchHit, UserInfo } from "@/lib/community/types";
-import Avatar from "./Avatar";
+import Avatar, { PresenceDot } from "./Avatar";
 import { Icon } from "./icons";
 import MessageBody from "./MessageBody";
 import Modal, { PrimaryButton, SecondaryButton, inputClass } from "./Modal";
 import { ChannelGlyph } from "./Sidebar";
-import { useActions, useChannel, useCS, useMe, useName, useNameOf, useOnline, useUser } from "./store";
+import ChannelIconPicker, { ChannelIconEditor, draftToInput, type IconDraft } from "./ChannelIconPicker";
+import { PRESENCE_LABEL, useActions, useChannel, useCS, useMe, useName, useNameOf, usePresence, useUser } from "./store";
 import { useOpenModal, useUi, type DetailsTab } from "./ui";
 
 const textareaClass = `${inputClass} h-auto py-2 leading-[1.46668]`;
 
 function StaffTag() {
-  return <span className="rounded-[3px] bg-[#1D1C1D14] px-1 py-[1px] text-[10px] font-bold text-sk-mute">運営</span>;
+  return <span className="rounded-full bg-[#E3F0E8] px-2 py-[1px] text-[10px] font-bold text-[#2D6A4F]">運営</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +49,9 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
   const [bio, setBio] = useState(me.profile?.bio ?? "");
   const [allowDm, setAllowDm] = useState(me.profile?.allow_dm ?? true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const photoRef = useRef<HTMLInputElement | null>(null);
   const first = !me.isStaff && !me.profile?.setup_done;
 
   const submit = async (e?: React.FormEvent) => {
@@ -80,7 +83,7 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
     >
       <form onSubmit={submit} className="space-y-5">
         {first && (
-          <p className="rounded-[8px] bg-[#1D9BD11A] p-3 text-[15px] leading-relaxed">
+          <p className="rounded-[12px] bg-[#2D8A621A] p-3 text-[15px] leading-relaxed">
             はじめに、コミュニティで表示する名前を設定してください。ご本名は他の会員には表示されません（運営のみ確認できます）。
           </p>
         )}
@@ -113,11 +116,51 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
               />
             </label>
           </div>
-          <div className="hidden sm:block text-center">
-            <Avatar userId={me.id} size={120} />
-            <Link href="/mypage/profile" className="mt-2 block text-[13px] text-sk-link hover:underline">
-              写真を変更する
-            </Link>
+          <div className="shrink-0 text-center">
+            <input
+              ref={photoRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                if (f.size > 5 * 1024 * 1024) {
+                  setError("写真は5MB以内にしてください。");
+                  return;
+                }
+                setError(null);
+                setUploading(true);
+                await actions.uploadAvatar(f);
+                setUploading(false);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => photoRef.current?.click()}
+              disabled={uploading}
+              className="group/av relative block rounded-full"
+              aria-label="写真を変更する"
+            >
+              <Avatar userId={me.id} size={96} />
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 text-white opacity-0 transition-opacity group-hover/av:opacity-100">
+                {uploading ? (
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                ) : (
+                  <Icon name="edit" className="w-5 h-5" />
+                )}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => photoRef.current?.click()}
+              disabled={uploading}
+              className="mt-2 block w-full text-[13px] font-bold text-sk-link hover:underline disabled:opacity-60"
+            >
+              {uploading ? "アップロード中…" : "写真を変更する"}
+            </button>
+            <span className="mt-0.5 block text-[11px] text-sk-mute">マイページの写真も<br />同じになります</span>
           </div>
         </div>
         {!me.isStaff && (
@@ -129,7 +172,7 @@ function ProfileModal({ onClose }: { onClose: () => void }) {
             </span>
           </label>
         )}
-        {error && <p className="text-[13px] font-bold text-[#E01E5A]">{error}</p>}
+        {error && <p className="text-[13px] font-bold text-[#D2475E]">{error}</p>}
         <button type="submit" hidden />
       </form>
     </Modal>
@@ -179,12 +222,12 @@ function PeoplePicker({
 
   return (
     <div>
-      <div className="flex min-h-10 flex-wrap items-center gap-1 rounded-[4px] border border-[#1D1C1D4D] px-1.5 py-1 focus-within:border-[#1D9BD1] focus-within:shadow-[0_0_0_1px_#1D9BD1,0_0_0_5px_rgba(29,155,209,0.3)]">
+      <div className="flex min-h-10 flex-wrap items-center gap-1 rounded-[8px] border border-[#1E2B244D] px-1.5 py-1 focus-within:border-[#2D8A62] focus-within:shadow-[0_0_0_1px_#2D8A62,0_0_0_5px_rgba(45,138,98,0.3)]">
         {selected.map((u) => (
-          <span key={u.user_id} className="flex h-7 items-center gap-1 rounded-[4px] bg-[#1D9BD11A] pl-0.5 pr-1 text-[13px] font-bold text-sk-link">
+          <span key={u.user_id} className="flex h-7 items-center gap-1 rounded-[8px] bg-[#2D8A621A] pl-0.5 pr-1 text-[13px] font-bold text-sk-link">
             <Avatar userId={u.user_id} size={22} />
             {u.display_name ?? "会員"}
-            <button type="button" onClick={() => toggle(u)} aria-label={`${u.display_name} を外す`} className="rounded-[3px] hover:bg-[#1D9BD133]">
+            <button type="button" onClick={() => toggle(u)} aria-label={`${u.display_name} を外す`} className="rounded-[3px] hover:bg-[#2D8A6233]">
               <Icon name="close" className="w-3.5 h-3.5" strokeWidth={2.5} />
             </button>
           </span>
@@ -193,7 +236,7 @@ function PeoplePicker({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={selected.length ? "" : me.isStaff ? "表示名・氏名で検索" : "表示名で検索"}
-          className="h-7 min-w-[140px] flex-1 bg-transparent px-1.5 text-[15px] outline-none placeholder:text-[#1D1C1D80]"
+          className="h-7 min-w-[140px] flex-1 bg-transparent px-1.5 text-[15px] outline-none placeholder:text-[#1E2B2480]"
           autoFocus
         />
       </div>
@@ -207,7 +250,7 @@ function PeoplePicker({
               <button
                 type="button"
                 onClick={() => toggle(u)}
-                className={`flex w-full items-center gap-3 rounded-[6px] px-2 py-1.5 text-left ${on ? "bg-[#1D9BD11A]" : "hover:bg-sk-soft"}`}
+                className={`flex w-full items-center gap-3 rounded-[10px] px-2 py-1.5 text-left ${on ? "bg-[#2D8A621A]" : "hover:bg-sk-soft"}`}
               >
                 <Avatar userId={u.user_id} size={28} showOnline />
                 <span className="min-w-0 flex-1">
@@ -217,7 +260,7 @@ function PeoplePicker({
                   </span>
                   {me.isStaff && u.real_name && <span className="block truncate text-[12px] text-sk-mute">氏名: {u.real_name}</span>}
                 </span>
-                <span className={`flex h-5 w-5 items-center justify-center rounded-[4px] border ${on ? "border-sk-green bg-sk-green text-white" : "border-[#1D1C1D4D]"}`}>
+                <span className={`flex h-5 w-5 items-center justify-center rounded-[8px] border ${on ? "border-sk-green bg-sk-green text-white" : "border-[#1E2B244D]"}`}>
                   {on && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
                 </span>
               </button>
@@ -243,6 +286,7 @@ function CreateChannelModal({ initialVisibility, onClose }: { initialVisibility?
   const [staffOnly, setStaffOnly] = useState(false);
   const [autoJoin, setAutoJoin] = useState(false);
   const [members, setMembers] = useState<UserInfo[]>([]);
+  const [icon, setIcon] = useState<IconDraft>(null);
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const profileReady = me.isStaff || !!me.profile?.setup_done;
@@ -260,6 +304,8 @@ function CreateChannelModal({ initialVisibility, onClose }: { initialVisibility?
       postPolicy: me.isStaff && staffOnly ? "staff" : "everyone",
       autoJoin: everyone,
     });
+    // アイコンはチャンネルを作ってから保存する（失敗してもチャンネル自体は作成済み）
+    if (id && icon) await actions.setChannelIcon(id, draftToInput(icon));
     setBusy(false);
     if (id) onClose();
   };
@@ -324,13 +370,13 @@ function CreateChannelModal({ initialVisibility, onClose }: { initialVisibility?
       <label className="block">
         <span className="mb-1.5 flex items-baseline justify-between">
           <span className="text-[15px] font-bold">名前</span>
-          <span className={`text-[13px] tabular-nums ${normalized.length > CHANNEL_NAME_LIMIT ? "text-[#E01E5A]" : "text-sk-mute"}`}>
+          <span className={`text-[13px] tabular-nums ${normalized.length > CHANNEL_NAME_LIMIT ? "text-[#D2475E]" : "text-sk-mute"}`}>
             {CHANNEL_NAME_LIMIT - normalized.length}
           </span>
         </span>
         <span
-          className={`flex h-10 items-center gap-1 rounded-[4px] border px-3 focus-within:shadow-[0_0_0_1px_#1D9BD1,0_0_0_5px_rgba(29,155,209,0.3)] ${
-            touched && problem ? "border-[#E01E5A]" : "border-[#1D1C1D4D] focus-within:border-[#1D9BD1]"
+          className={`flex h-10 items-center gap-1 rounded-[8px] border px-3 focus-within:shadow-[0_0_0_1px_#2D8A62,0_0_0_5px_rgba(45,138,98,0.3)] ${
+            touched && problem ? "border-[#D2475E]" : "border-[#1E2B244D] focus-within:border-[#2D8A62]"
           }`}
         >
           <span className="text-sk-mute">
@@ -347,12 +393,12 @@ function CreateChannelModal({ initialVisibility, onClose }: { initialVisibility?
               }
             }}
             placeholder="例：馬の写真部"
-            className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1D1C1D80]"
+            className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1E2B2480]"
             autoFocus
           />
         </span>
         {touched && problem ? (
-          <span className="mt-1 block text-[13px] font-bold text-[#E01E5A]">{problem}</span>
+          <span className="mt-1 block text-[13px] font-bold text-[#D2475E]">{problem}</span>
         ) : normalized && normalized !== name.trim() ? (
           <span className="mt-1 block text-[13px] text-sk-mute">チャンネル名は「{normalized}」になります。</span>
         ) : null}
@@ -371,6 +417,24 @@ function CreateChannelModal({ initialVisibility, onClose }: { initialVisibility?
           placeholder="このチャンネルについて"
         />
       </label>
+
+      <div className="mt-5">
+        <span className="mb-2 block text-[15px] font-bold">
+          アイコン <span className="font-normal text-sk-mute">（任意）</span>
+        </span>
+        <ChannelIconPicker
+          value={icon}
+          placeholder={<Icon name={visibility === "private" ? "lock" : "hash"} className="w-6 h-6" strokeWidth={2.4} />}
+          onPick={(d) => {
+            if (icon?.kind === "file") URL.revokeObjectURL(icon.preview);
+            setIcon(d);
+          }}
+          onClear={() => {
+            if (icon?.kind === "file") URL.revokeObjectURL(icon.preview);
+            setIcon(null);
+          }}
+        />
+      </div>
 
       <fieldset className="mt-5">
         <legend className="mb-2 text-[15px] font-bold">表示レベル</legend>
@@ -391,7 +455,7 @@ function CreateChannelModal({ initialVisibility, onClose }: { initialVisibility?
       </fieldset>
 
       {me.isStaff && (
-        <fieldset className="mt-4 space-y-2 rounded-[8px] border border-sk-line p-3">
+        <fieldset className="mt-4 space-y-2 rounded-[12px] border border-sk-line p-3">
           <legend className="px-1 text-[13px] font-bold text-sk-mute">運営向けの設定</legend>
           <label className="flex items-start gap-2 text-[15px]">
             <input type="checkbox" className="mt-1 h-4 w-4" checked={staffOnly} onChange={(e) => setStaffOnly(e.target.checked)} />
@@ -430,7 +494,7 @@ function InviteModal({ channelId, onClose }: { channelId: string; onClose: () =>
       title={
         <span className="flex items-center gap-1.5">
           <span className="text-sk-mute">
-            <ChannelGlyph ch={ch} className="w-5 h-5" />
+            <ChannelGlyph ch={ch} className="w-5 h-5" size={20} />
           </span>
           {ch.name} にメンバーを追加する
         </span>
@@ -492,10 +556,10 @@ function DirectoryModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal title="新しいメッセージ" onClose={onClose}>
-      <label className="flex h-10 items-center gap-2 rounded-[4px] border border-[#1D1C1D4D] px-3 focus-within:border-[#1D9BD1] focus-within:shadow-[0_0_0_1px_#1D9BD1,0_0_0_5px_rgba(29,155,209,0.3)]">
+      <label className="flex h-10 items-center gap-2 rounded-[8px] border border-[#1E2B244D] px-3 focus-within:border-[#2D8A62] focus-within:shadow-[0_0_0_1px_#2D8A62,0_0_0_5px_rgba(45,138,98,0.3)]">
         <span className="text-[15px] text-sk-mute">宛先:</span>
         <input
-          className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1D1C1D80]"
+          className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1E2B2480]"
           placeholder={me.isStaff ? "表示名・氏名・フリガナ" : "表示名"}
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -507,7 +571,7 @@ function DirectoryModal({ onClose }: { onClose: () => void }) {
           ? "コミュニティを利用できる会員全員に送れます（表示名を未設定の方は氏名で表示）。"
           : "運営スタッフと、ダイレクトメッセージを受け付けている会員が表示されます。"}
       </p>
-      {error && <p className="mt-2 text-[13px] font-bold text-[#E01E5A]">{error}</p>}
+      {error && <p className="mt-2 text-[13px] font-bold text-[#D2475E]">{error}</p>}
       <ul className="mt-2">
         {loading && rows.length === 0 && <li className="px-2 py-3 text-[13px] text-sk-mute animate-pulse">検索中…</li>}
         {!loading && rows.length === 0 && !error && <li className="px-2 py-3 text-[13px] text-sk-mute">該当するメンバーがいません。</li>}
@@ -515,7 +579,7 @@ function DirectoryModal({ onClose }: { onClose: () => void }) {
           <li key={u.user_id}>
             <button
               type="button"
-              className="flex w-full items-center gap-3 rounded-[6px] px-2 py-1.5 text-left hover:bg-sk-active hover:text-white group"
+              className="flex w-full items-center gap-3 rounded-[10px] px-2 py-1.5 text-left hover:bg-sk-active hover:text-white group"
               onClick={async () => {
                 onClose();
                 await actions.startDm(u.user_id);
@@ -621,10 +685,10 @@ function BrowseModal({ onClose }: { onClose: () => void }) {
       bodyClassName="px-7 pb-5"
     >
       <div className="flex gap-2">
-        <label className="flex h-10 flex-1 items-center gap-2 rounded-[4px] border border-[#1D1C1D4D] px-3 focus-within:border-[#1D9BD1] focus-within:shadow-[0_0_0_1px_#1D9BD1,0_0_0_5px_rgba(29,155,209,0.3)]">
+        <label className="flex h-10 flex-1 items-center gap-2 rounded-[8px] border border-[#1E2B244D] px-3 focus-within:border-[#2D8A62] focus-within:shadow-[0_0_0_1px_#2D8A62,0_0_0_5px_rgba(45,138,98,0.3)]">
           <Icon name="search" className="w-4 h-4 text-sk-mute" />
           <input
-            className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1D1C1D80]"
+            className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1E2B2480]"
             placeholder="チャンネルを検索"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -649,7 +713,7 @@ function BrowseModal({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={() => setFilter(k)}
             className={`h-7 rounded-[14px] border px-3 text-[13px] font-bold ${
-              filter === k ? "border-sk-text bg-sk-text text-white" : "border-[#1D1C1D4D] text-sk-text hover:bg-sk-soft"
+              filter === k ? "border-sk-text bg-sk-text text-white" : "border-[#1E2B244D] text-sk-text hover:bg-sk-soft"
             }`}
           >
             {label}
@@ -727,7 +791,7 @@ function InlineEditor({
       {multiline ? (
         <textarea className={textareaClass} rows={3} value={v} maxLength={max} onChange={(e) => setV(e.target.value)} autoFocus />
       ) : (
-        <span className="flex h-10 items-center gap-1 rounded-[4px] border border-[#1D9BD1] px-3 shadow-[0_0_0_1px_#1D9BD1,0_0_0_5px_rgba(29,155,209,0.3)]">
+        <span className="flex h-10 items-center gap-1 rounded-[8px] border border-[#2D8A62] px-3 shadow-[0_0_0_1px_#2D8A62,0_0_0_5px_rgba(45,138,98,0.3)]">
           {prefix}
           <input
             className="min-w-0 flex-1 bg-transparent text-[15px] outline-none"
@@ -775,7 +839,7 @@ function AboutTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
   const audience = audienceText(ch);
   return (
     <div className="space-y-4">
-      <div className="divide-y divide-sk-line rounded-[8px] border border-sk-line">
+      <div className="divide-y divide-sk-line rounded-[12px] border border-sk-line">
         <InfoCard
           label="チャンネル名"
           value={
@@ -796,6 +860,24 @@ function AboutTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
             />
           }
         />
+        {(ch.can_manage && !ch.is_archived) || ch.icon ? (
+          <InfoCard
+            label="アイコン"
+            value={
+              ch.can_manage && !ch.is_archived ? (
+                <ChannelIconEditor
+                  icon={ch.icon}
+                  placeholder={<Icon name={ch.visibility === "private" ? "lock" : "hash"} className="w-6 h-6" strokeWidth={2.4} />}
+                  onSave={(input) => actions.setChannelIcon(ch.id, input)}
+                />
+              ) : (
+                <span className="inline-flex h-12 w-12 items-center justify-center rounded-[14px] bg-[#E3F0E8]">
+                  <ChannelGlyph ch={ch} size={ch.icon && ch.icon.startsWith("/") ? 48 : 28} />
+                </span>
+              )
+            }
+          />
+        ) : null}
         <InfoCard
           label="トピック"
           value={ch.topic || <span className="text-sk-mute">トピックを追加</span>}
@@ -842,7 +924,7 @@ function AboutTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
         ? !ch.is_required && (
             <button
               type="button"
-              className="w-full rounded-[8px] border border-sk-line px-4 py-3 text-left text-[15px] font-bold text-[#E01E5A] hover:bg-sk-soft"
+              className="w-full rounded-[12px] border border-sk-line px-4 py-3 text-left text-[15px] font-bold text-[#D2475E] hover:bg-sk-soft"
               onClick={async () => {
                 if (!window.confirm(`#${ch.name} から退出しますか？`)) return;
                 onClose();
@@ -874,7 +956,7 @@ function MemberRow({ userId, ch, canRemove }: { userId: string; ch: ChannelRow; 
   const u = useUser(userId);
   const me = useMe();
   return (
-    <li className="group flex items-center gap-3 rounded-[6px] px-2 py-1.5 hover:bg-sk-soft">
+    <li className="group flex items-center gap-3 rounded-[10px] px-2 py-1.5 hover:bg-sk-soft">
       <button type="button" onClick={() => openModal({ type: "user", userId })} className="flex min-w-0 flex-1 items-center gap-3 text-left">
         <Avatar userId={userId} size={36} showOnline />
         <span className="min-w-0">
@@ -922,10 +1004,10 @@ function MembersTab({ ch }: { ch: ChannelRow }) {
   const hidden = (members?.total ?? ch.member_count) - (members?.ids.length ?? 0);
   return (
     <div>
-      <label className="flex h-10 items-center gap-2 rounded-[4px] border border-[#1D1C1D4D] px-3 focus-within:border-[#1D9BD1] focus-within:shadow-[0_0_0_1px_#1D9BD1,0_0_0_5px_rgba(29,155,209,0.3)]">
+      <label className="flex h-10 items-center gap-2 rounded-[8px] border border-[#1E2B244D] px-3 focus-within:border-[#2D8A62] focus-within:shadow-[0_0_0_1px_#2D8A62,0_0_0_5px_rgba(45,138,98,0.3)]">
         <Icon name="search" className="w-4 h-4 text-sk-mute" />
         <input
-          className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1D1C1D80]"
+          className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1E2B2480]"
           placeholder="メンバーを検索"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -937,9 +1019,9 @@ function MembersTab({ ch }: { ch: ChannelRow }) {
             <button
               type="button"
               onClick={() => openModal({ type: "invite", channelId: ch.id })}
-              className="flex w-full items-center gap-3 rounded-[6px] px-2 py-1.5 text-left hover:bg-sk-soft"
+              className="flex w-full items-center gap-3 rounded-[10px] px-2 py-1.5 text-left hover:bg-sk-soft"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[#1D9BD11A] text-sk-link">
+              <span className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-[#2D8A621A] text-sk-link">
                 <Icon name="userPlus" />
               </span>
               <span className="text-[15px] font-bold">メンバーを追加</span>
@@ -966,7 +1048,7 @@ function SettingsTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
   return (
     <div className="space-y-4">
       {ch.joined && (
-        <fieldset className="rounded-[8px] border border-sk-line p-4">
+        <fieldset className="rounded-[12px] border border-sk-line p-4">
           <legend className="px-1 text-[15px] font-bold">通知</legend>
           {NOTIFY_LEVELS.map((l) => (
             <label key={l} className="flex cursor-pointer items-center gap-2 py-1 text-[15px]">
@@ -980,14 +1062,14 @@ function SettingsTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
           </label>
         </fieldset>
       )}
-      <div className="divide-y divide-sk-line rounded-[8px] border border-sk-line">
+      <div className="divide-y divide-sk-line rounded-[12px] border border-sk-line">
         {(ch.joined || me.isStaff) && (
           <button
             type="button"
             onClick={() => void actions.toggleStar(ch.id)}
             className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px] hover:bg-sk-soft"
           >
-            <Icon name="star" className={`w-4 h-4 ${ch.is_starred ? "text-[#E8912D]" : ""}`} filled={ch.is_starred} />
+            <Icon name="star" className={`w-4 h-4 ${ch.is_starred ? "text-[#DB9A2E]" : ""}`} filled={ch.is_starred} />
             {ch.is_starred ? "スターを外す" : "スターを付ける"}
           </button>
         )}
@@ -1000,7 +1082,7 @@ function SettingsTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
               const ok = await actions.archiveChannel(ch.id, archive);
               if (ok && archive) onClose();
             }}
-            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px] text-[#E01E5A] hover:bg-sk-soft"
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px] text-[#D2475E] hover:bg-sk-soft"
           >
             <Icon name="archive" className="w-4 h-4" />
             {ch.is_archived ? "アーカイブを解除する" : "チャンネルをアーカイブする"}
@@ -1033,7 +1115,7 @@ function DetailsModal({ channelId, tab: initialTab, onClose }: { channelId: stri
     <Modal
       title={
         <span className="flex items-center gap-1.5">
-          <ChannelGlyph ch={ch} className="w-5 h-5" />
+          <ChannelGlyph ch={ch} className="w-5 h-5" size={20} />
           {ch.name}
         </span>
       }
@@ -1105,10 +1187,10 @@ function SearchModal({ channelId, onClose }: { channelId: string | null; onClose
   return (
     <Modal title="検索" onClose={onClose} wide>
       <form onSubmit={run}>
-        <label className="flex h-11 items-center gap-2 rounded-[8px] border border-[#1D9BD1] px-3 shadow-[0_0_0_1px_#1D9BD1,0_0_0_5px_rgba(29,155,209,0.3)]">
+        <label className="flex h-11 items-center gap-2 rounded-[12px] border border-[#2D8A62] px-3 shadow-[0_0_0_1px_#2D8A62,0_0_0_5px_rgba(45,138,98,0.3)]">
           <Icon name="search" className="w-5 h-5 text-sk-mute" />
           <input
-            className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1D1C1D80]"
+            className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#1E2B2480]"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={scoped ? `${scoped.kind === "dm" ? "この会話" : `#${scoped.name}`} を検索` : "Retouch を検索"}
@@ -1133,7 +1215,7 @@ function SearchModal({ channelId, onClose }: { channelId: string | null; onClose
               type="button"
               onClick={() => setScope(v)}
               className={`h-7 rounded-[14px] border px-3 text-[13px] font-bold ${
-                scope === v ? "border-sk-text bg-sk-text text-white" : "border-[#1D1C1D4D] hover:bg-sk-soft"
+                scope === v ? "border-sk-text bg-sk-text text-white" : "border-[#1E2B244D] hover:bg-sk-soft"
               }`}
             >
               {l}
@@ -1141,7 +1223,7 @@ function SearchModal({ channelId, onClose }: { channelId: string | null; onClose
           ))}
         </div>
       )}
-      {error && <p className="mt-3 text-[13px] font-bold text-[#E01E5A]">{error}</p>}
+      {error && <p className="mt-3 text-[13px] font-bold text-[#D2475E]">{error}</p>}
       {loading && <p className="mt-4 text-[13px] text-sk-mute animate-pulse">検索中…</p>}
       {!loading && searched && hits.length === 0 && <p className="mt-4 text-[15px] text-sk-mute">「{q}」に一致するメッセージはありません。</p>}
       {hits.length > 0 && <p className="mt-4 text-[13px] font-bold text-sk-mute">{hits.length}件のメッセージ</p>}
@@ -1150,7 +1232,7 @@ function SearchModal({ channelId, onClose }: { channelId: string | null; onClose
           <li key={h.id}>
             <button
               type="button"
-              className="flex w-full gap-3 rounded-[8px] border border-sk-line p-3 text-left hover:bg-sk-soft"
+              className="flex w-full gap-3 rounded-[12px] border border-sk-line p-3 text-left hover:bg-sk-soft"
               onClick={() => {
                 onClose();
                 void actions.jumpTo(h);
@@ -1204,7 +1286,7 @@ function PinnedModal({ channelId, onClose }: { channelId: string; onClose: () =>
 
   return (
     <Modal title="ピン留めアイテム" subtitle={ch?.kind === "channel" ? `#${ch.name}` : undefined} onClose={onClose} wide>
-      {error && <p className="text-[13px] font-bold text-[#E01E5A]">{error}</p>}
+      {error && <p className="text-[13px] font-bold text-[#D2475E]">{error}</p>}
       {!items && !error && <p className="text-[13px] text-sk-mute animate-pulse">読み込み中…</p>}
       {items && items.length === 0 && (
         <div className="py-8 text-center">
@@ -1215,7 +1297,7 @@ function PinnedModal({ channelId, onClose }: { channelId: string; onClose: () =>
       )}
       <ul className="space-y-2">
         {(items ?? []).map((m) => (
-          <li key={m.id} className="rounded-[8px] border border-sk-line p-3">
+          <li key={m.id} className="rounded-[12px] border border-sk-line p-3">
             <div className="mb-1 flex items-center gap-2">
               <Avatar userId={m.user_id} size={24} />
               <span className="text-[15px] font-black">{nameOf(m.user_id)}</span>
@@ -1264,7 +1346,7 @@ function ReportModal({ message, onClose }: { message: Message; onClose: () => vo
           <SecondaryButton onClick={onClose}>キャンセル</SecondaryButton>
           <button
             type="button"
-            className="h-9 rounded-[4px] bg-[#E01E5A] px-4 text-[15px] font-bold text-white hover:bg-[#C71B50] disabled:opacity-50"
+            className="h-9 rounded-[8px] bg-[#D2475E] px-4 text-[15px] font-bold text-white hover:bg-[#B53A4F] disabled:opacity-50"
             disabled={sending || !reason.trim()}
             onClick={() => void submit()}
           >
@@ -1273,7 +1355,7 @@ function ReportModal({ message, onClose }: { message: Message; onClose: () => vo
         </>
       }
     >
-      <div className="rounded-[8px] border-l-4 border-sk-line bg-sk-soft p-3 text-[15px]">
+      <div className="rounded-[12px] border-l-4 border-sk-line bg-sk-soft p-3 text-[15px]">
         <p className="mb-1 text-[13px] font-bold">{nameOf(message.user_id)} さんのメッセージ</p>
         <p className="line-clamp-4 whitespace-pre-wrap">{plainText(message.body, nameOf, 400) || "（添付ファイル）"}</p>
       </div>
@@ -1303,7 +1385,7 @@ function UserModal({ userId, onClose }: { userId: string; onClose: () => void })
   const me = useMe();
   const u = useUser(userId);
   const name = useName(userId);
-  const online = useOnline(userId);
+  const presence = usePresence(userId);
   useEffect(() => actions.ensureUsers([userId]), [userId, actions]);
   const isMe = userId === me.id;
   const bio = isMe ? me.profile?.bio : u?.bio;
@@ -1317,8 +1399,8 @@ function UserModal({ userId, onClose }: { userId: string; onClose: () => void })
             {(u?.is_staff || (isMe && me.isStaff)) && <StaffTag />}
           </p>
           <p className="mt-1 flex items-center justify-center gap-1.5 text-[15px] text-sk-mute sm:justify-start">
-            <span className={`h-2.5 w-2.5 rounded-[999px] ${online ? "bg-sk-presence" : "border-2 border-sk-mute"}`} />
-            {online ? "アクティブ" : "離席中"}
+            <PresenceDot presence={presence} size={10} ring="transparent" />
+            {PRESENCE_LABEL[presence]}
           </p>
           {me.isStaff && !isMe && (u?.real_name || u?.username) && (
             <p className="mt-2 text-[13px] text-sk-mute">
@@ -1355,7 +1437,7 @@ function ReadersModal({ userIds, title, onClose }: { userIds: string[]; title: s
     <Modal title={`${title}（${userIds.length}人）`} onClose={onClose}>
       <ul>
         {userIds.map((id) => (
-          <li key={id} className="flex items-center gap-3 rounded-[6px] px-2 py-1.5 hover:bg-sk-soft">
+          <li key={id} className="flex items-center gap-3 rounded-[10px] px-2 py-1.5 hover:bg-sk-soft">
             <Avatar userId={id} size={28} />
             <span className="text-[15px] font-bold">{nameOf(id)}</span>
           </li>

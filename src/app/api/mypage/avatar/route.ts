@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { extensionForType, savePublicUpload } from "@/lib/fileStorage";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -27,22 +28,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JPEG/PNG/WEBP/GIF のみ対応しています" }, { status: 400 });
   }
 
-  const ext = file.name.includes(".")
-    ? file.name.slice(file.name.lastIndexOf(".") + 1).toLowerCase()
-    : file.type.split("/")[1] ?? "jpg";
+  // 拡張子は検証済みの MIME タイプから決める（配信時の Content-Type が拡張子で決まるため）。
+  const ext = extensionForType(file.type) ?? "jpg";
   const path = `${session.userId}/${Date.now()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const admin = createSupabaseAdminClient();
-  const { error: upErr } = await admin.storage
-    .from("avatars")
-    .upload(path, buffer, { contentType: file.type, upsert: true });
-  if (upErr) {
+  // ファイル本体は VPS に保存し、DB にはパス（/uploads/...）だけを保存する。
+  let avatarUrl: string;
+  try {
+    avatarUrl = await savePublicUpload(path, buffer);
+  } catch {
     return NextResponse.json({ error: "アップロードに失敗しました" }, { status: 500 });
   }
 
-  const { data: pub } = admin.storage.from("avatars").getPublicUrl(path);
-  const avatarUrl = pub.publicUrl;
+  const admin = createSupabaseAdminClient();
 
   const { error } = await admin
     .from("customers")
@@ -51,6 +50,10 @@ export async function POST(req: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // コミュニティのアイコンも同じ写真にそろえる（プロフィール行がまだ無い場合は、
+  // 初めてコミュニティを開いたときに customers.avatar_url から作られる）。
+  await admin.from("community_profiles").update({ avatar_url: avatarUrl }).eq("user_id", session.userId);
 
   return NextResponse.json({ ok: true, avatar_url: avatarUrl });
 }

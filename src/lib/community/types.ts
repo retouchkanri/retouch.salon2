@@ -36,6 +36,8 @@ export type ChannelRow = {
   last_message_user_id: string | null;
   /** メンバー数（Slack と同じく参加している人数。自動参加のチャンネルは参加資格のある全員）。 */
   member_count: number;
+  /** アイコン（画像のパス /uploads/... または絵文字1つ。null = # / 鍵のマーク）。 */
+  icon?: string | null;
 };
 
 export type Attachment = {
@@ -112,6 +114,8 @@ export type UnreadSummary = {
   badge: number;
   has_unread: boolean;
   dm_unread: number;
+  /** 他の人から届いた未読メッセージの合計（ミュートは除く）。データベース更新前は badge と同じ値。 */
+  unread_total: number;
 };
 
 /** community_history() の戻り値（古い順）。 */

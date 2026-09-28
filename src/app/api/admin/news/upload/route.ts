@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { savePublicUpload, withTypeExtension } from "@/lib/fileStorage";
 
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
@@ -24,27 +24,12 @@ export async function POST(req: Request) {
 
     const rand = Math.random().toString(36).slice(2, 8);
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-    const path = `news-pdfs/${Date.now()}-${rand}-${safeName}`;
+    const path = `news-pdfs/${Date.now()}-${rand}-${withTypeExtension(safeName, file.type)}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const admin = createSupabaseAdminClient();
-    const { error: upErr } = await admin.storage
-      .from("avatars")
-      .upload(path, buffer, { contentType: "application/pdf", upsert: true });
-
-    if (upErr) {
-      return NextResponse.json(
-        { error: `アップロードに失敗しました: ${upErr.message}` },
-        { status: 500 },
-      );
-    }
-
-    const { data: pub } = admin.storage.from("avatars").getPublicUrl(path);
-    if (!pub?.publicUrl) {
-      return NextResponse.json({ error: "公開URLの取得に失敗しました" }, { status: 500 });
-    }
-
-    return NextResponse.json({ ok: true, url: pub.publicUrl, name: file.name });
+    // ファイル本体は VPS に保存し、DB にはパス（/uploads/...）だけを保存する。
+    const url = await savePublicUpload(path, buffer);
+    return NextResponse.json({ ok: true, url, name: file.name });
   } catch (e) {
     const message = e instanceof Error ? e.message : "不明なエラー";
     return NextResponse.json({ error: `アップロード処理でエラー: ${message}` }, { status: 500 });

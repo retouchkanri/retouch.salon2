@@ -114,6 +114,9 @@ export default async function BackupsAdminPage() {
                   <span className="text-green-700">
                     ✓ 成功 — {formatBytes(lastRun.bytes)}・{(lastRun.rows ?? 0).toLocaleString("ja-JP")} 行・
                     {lastRun.tables} テーブル・認証ユーザー {lastRun.auth_users ?? 0} 件
+                    {lastRun.files != null && (
+                      <>・ファイル {lastRun.files.toLocaleString("ja-JP")} 件（{formatBytes(lastRun.file_bytes)}）</>
+                    )}
                   </span>
                 ) : (
                   <span className="text-red-600">✗ 失敗 — {lastRun.error}</span>
@@ -223,12 +226,20 @@ export default async function BackupsAdminPage() {
         <ul className="list-disc pl-5 space-y-1">
           <li>
             内容: データベースの全テーブル（会員・支援・契約・決済・寄付・予約・お知らせ・監査ログ等）と、
-            ログイン用の認証ユーザー一覧（メールアドレス等。パスワードは含まれません）。
-            画像・PDF などのアップロードファイルは含まれません。
+            ログイン用の認証ユーザー一覧（メールアドレス等。パスワードは含まれません）に加え、
+            VPS に保存しているアップロードファイル一式（会員アバター・馬画像・お知らせ／会員向けメッセージの画像・PDF・
+            コミュニティの添付ファイル）。
           </li>
-          <li>形式: gzip 圧縮した JSON（.json.gz）。7-Zip などで展開できます。</li>
           <li>
-            保存先: Supabase Storage の非公開領域（db-backups）。ダウンロード・削除は監査ログに記録されます。
+            形式: すべてを 1 つにまとめた .tar.gz ファイル（manifest.json・database.json・files/）。
+            Windows の <code className="bg-surface-2 px-1 rounded mx-1">tar -xzf</code> や 7-Zip で展開できます。
+            以前の .json.gz（DB のみ）も一覧・ダウンロード・復元できます。
+          </li>
+          <li>
+            保存先: この VPS のプロジェクト内
+            <code className="bg-surface-2 px-1 rounded mx-1">backups/</code>
+            フォルダ（非公開）。自動バックアップは日本時間の日付ごと 1 ファイルです。
+            ダウンロード・削除は監査ログに記録されます。サーバー障害に備え、定期的にダウンロードして別の場所にも保管してください。
           </li>
           <li>
             会員の個人情報を含みます。ダウンロードしたファイルは社外に送らず、不要になったら削除してください。
@@ -236,7 +247,11 @@ export default async function BackupsAdminPage() {
           <li>
             自動バックアップは保存世代数を超えた古いものから自動で削除されます。
           </li>
-          <li>復元は画面からは行えません。必要な場合は開発担当者に依頼してください。</li>
+          <li>
+            復元は画面からは行えません。開発担当者がサーバー上で
+            <code className="bg-surface-2 px-1 rounded mx-1">npx tsx scripts/restore-backup.ts backups/&lt;ファイル名&gt;</code>
+            を実行して、データベースとファイルを戻します（手順は README の「バックアップと復元」）。
+          </li>
         </ul>
       </section>
     </div>

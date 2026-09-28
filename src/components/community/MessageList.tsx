@@ -50,7 +50,7 @@ function Intro({ ch }: { ch: ChannelRow }) {
   return (
     <div className="px-5 pb-4 pt-10">
       <p className="flex items-center gap-1.5 text-[22px] font-black text-sk-text">
-        <ChannelGlyph ch={ch} className="w-[22px] h-[22px]" />
+        <ChannelGlyph ch={ch} className="w-[22px] h-[22px]" size={26} />
         {ch.name}
       </p>
       <p className="mt-1 text-[15px] text-sk-mute">
@@ -70,7 +70,7 @@ function Intro({ ch }: { ch: ChannelRow }) {
             <button
               type="button"
               onClick={() => openModal({ type: "details", channelId: ch.id, tab: "about" })}
-              className="flex h-8 items-center gap-1.5 rounded-[4px] border border-[#1D1C1D4D] px-3 text-[13px] font-bold text-sk-text hover:bg-sk-soft"
+              className="flex h-8 items-center gap-1.5 rounded-[8px] border border-[#1E2B244D] px-3 text-[13px] font-bold text-sk-text hover:bg-sk-soft"
             >
               <Icon name="edit" className="w-4 h-4" />
               {ch.description ? "説明を編集" : "説明を追加"}
@@ -80,7 +80,7 @@ function Intro({ ch }: { ch: ChannelRow }) {
             <button
               type="button"
               onClick={() => openModal({ type: "invite", channelId: ch.id })}
-              className="flex h-8 items-center gap-1.5 rounded-[4px] border border-[#1D1C1D4D] px-3 text-[13px] font-bold text-sk-text hover:bg-sk-soft"
+              className="flex h-8 items-center gap-1.5 rounded-[8px] border border-[#1E2B244D] px-3 text-[13px] font-bold text-sk-text hover:bg-sk-soft"
             >
               <Icon name="userPlus" className="w-4 h-4" />
               メンバーを追加
@@ -237,10 +237,10 @@ export default function MessageList({ channelId }: { channelId: string }) {
       <div className="flex-1 min-h-0 overflow-hidden px-5 pt-6" aria-busy="true" aria-label="読み込み中">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="mb-5 flex gap-2 animate-pulse">
-            <div className="h-9 w-9 rounded-[8px] bg-[#1D1C1D12]" />
+            <div className="h-9 w-9 rounded-[12px] bg-[#1E2B2412]" />
             <div className="flex-1 space-y-2 pt-1">
-              <div className="h-3 w-32 rounded-[3px] bg-[#1D1C1D12]" />
-              <div className="h-3 rounded-[3px] bg-[#1D1C1D0D]" style={{ width: `${70 - i * 12}%` }} />
+              <div className="h-3 w-32 rounded-[3px] bg-[#1E2B2412]" />
+              <div className="h-3 rounded-[3px] bg-[#1E2B240D]" style={{ width: `${70 - i * 12}%` }} />
             </div>
           </div>
         ))}
@@ -249,7 +249,7 @@ export default function MessageList({ channelId }: { channelId: string }) {
   }
   if (st.error && !st.loaded) {
     return (
-      <div className="flex flex-1 items-center justify-center p-6 text-center text-[15px] text-[#E01E5A]">{st.error}</div>
+      <div className="flex flex-1 items-center justify-center p-6 text-center text-[15px] text-[#D2475E]">{st.error}</div>
     );
   }
 
@@ -274,8 +274,8 @@ export default function MessageList({ channelId }: { channelId: string }) {
           {days.map((d) => (
             <section key={d.key} aria-label={d.label}>
               <div className="sticky top-0 z-[3] flex h-7 items-center justify-center" role="separator">
-                <span className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-sk-line" aria-hidden />
-                <span className="relative rounded-[24px] border border-sk-line bg-white px-4 py-[3px] text-[13px] font-bold text-sk-text shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+                
+                <span className="relative rounded-full bg-[#E3F0E8]/90 px-3 py-[3px] text-[12px] font-bold text-[#2D6A4F] backdrop-blur">
                   {d.label}
                 </span>
               </div>
@@ -315,7 +315,7 @@ export default function MessageList({ channelId }: { channelId: string }) {
         <button
           type="button"
           onClick={() => scrollToBottom(true)}
-          className="absolute bottom-3 left-1/2 z-[10] flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-[16px] bg-[#1D9BD1] px-4 text-[13px] font-bold text-white shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:bg-[#1A8DBF]"
+          className="absolute bottom-3 left-1/2 z-[10] flex h-8 -translate-x-1/2 items-center gap-1.5 rounded-[16px] bg-[#2D8A62] px-4 text-[13px] font-bold text-white shadow-[0_4px_12px_rgba(0,0,0,0.2)] hover:bg-[#247553]"
         >
           <Icon name="arrowDown" className="w-4 h-4" strokeWidth={2.5} />
           新しいメッセージ
