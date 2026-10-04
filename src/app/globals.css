@@ -475,3 +475,16 @@ details[open] .faq-chevron { transform: rotate(180deg); }
   background: rgba(29, 28, 29, 0.25);
   border-radius: 4px;
 }
+
+/* 新しく足した管理メニューの絵文字。どれが増えたかが分かるよう、軽く揺れる。 */
+@keyframes nav-fresh-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  35% { transform: translateY(-3px) rotate(-12deg); }
+  70% { transform: translateY(0) rotate(10deg); }
+}
+.nav-fresh-emoji {
+  animation: nav-fresh-bob 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-fresh-emoji { animation: none; }
+}

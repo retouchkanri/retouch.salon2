@@ -54,7 +54,7 @@ export type NotifyPayload = {
 const FROM_NAME_DEFAULT = "Retouchメンバーズ事務局";
 const SITE_URL_DEFAULT = "https://retouch-members.local";
 const CONTACT_EMAIL_DEFAULT = "info@retouch-members.local";
-const STAFF_RECIPIENTS_DEFAULT = "info@retouch-members.com";
+const STAFF_RECIPIENTS_DEFAULT = "info@retouch.salon";
 
 /** スタッフ通知の宛先。CONTACT_RECIPIENTS 環境変数で上書き可。 */
 export function staffRecipients(): string {

@@ -47,11 +47,9 @@ const focusRing =
 
 export default function AdminNav({
   role,
-  email,
   initialPrefs,
 }: {
   role: Role;
-  email: string | null;
   initialPrefs: NavPrefs;
 }) {
   const pathname = usePathname();
@@ -134,7 +132,7 @@ export default function AdminNav({
       <div className="flex items-center gap-2.5 px-3 py-2.5 md:hidden">
         {current ? (
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/[0.13]">
-            <NavEmoji emoji={current.emoji} />
+            <NavEmoji emoji={current.emoji} className={current.fresh ? "nav-fresh-emoji" : ""} />
           </span>
         ) : null}
         <span className="min-w-0 flex-1 truncate text-sm font-bold">{current?.label ?? "管理メニュー"}</span>
@@ -256,10 +254,11 @@ export default function AdminNav({
                           >
                             <NavEmoji
                               emoji={n.emoji}
-                              className="transition-transform duration-150 ease-out group-hover:scale-[1.18] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                              className={n.fresh ? "nav-fresh-emoji" : "transition-transform duration-150 ease-out group-hover:scale-[1.18] motion-reduce:transition-none motion-reduce:group-hover:scale-100"}
                             />
                           </span>
                           <span className={`min-w-0 flex-1 truncate ${railOnly("md:sr-only")}`}>{n.label}</span>
+                          {n.fresh ? <span className={`rounded-full bg-amber-300 px-1.5 text-[10px] font-bold leading-4 text-brand-dark ${railOnly("md:hidden")}`}>新</span> : null}
                           {n.external ? (
                             <>
                               <NavIcon
@@ -279,37 +278,6 @@ export default function AdminNav({
           );
         })}
       </nav>
-
-      {/* Account */}
-      <div
-        className={`${mobileOpen ? "block" : "hidden"} shrink-0 space-y-1 border-t border-white/10 bg-black/10 px-3 py-3 md:block`}
-      >
-        {email ? (
-          <div className="flex items-center gap-2.5 px-2" onMouseEnter={showTip(email)} onMouseLeave={hideTip}>
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-brand-light/20 text-xs font-bold uppercase text-brand-light ring-1 ring-inset ring-brand-light/30">
-              {email.charAt(0)}
-            </span>
-            <p className={`min-w-0 flex-1 truncate text-xs text-white/70 ${railOnly("md:hidden")}`} title={email}>
-              {email}
-            </p>
-          </div>
-        ) : null}
-        <form action="/api/auth/logout?next=/admin/login" method="post">
-          <button
-            type="submit"
-            onMouseEnter={showTip("ログアウト")}
-            onMouseLeave={hideTip}
-            onFocus={showTip("ログアウト")}
-            onBlur={hideTip}
-            className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1 text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white ${focusRing}`}
-          >
-            <span className="grid h-7 w-7 shrink-0 place-items-center">
-              <NavIcon name="logout" className="h-4 w-4" />
-            </span>
-            <span className={railOnly("md:sr-only")}>ログアウト</span>
-          </button>
-        </form>
-      </div>
 
       {tip ? (
         <div

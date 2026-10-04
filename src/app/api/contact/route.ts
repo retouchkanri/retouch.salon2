@@ -3,7 +3,7 @@ import { z } from "zod";
 import { contactAutoReplyTemplate, notify } from "@/lib/notify";
 
 // 各フォームの送信先（クライアント指定）。環境変数 CONTACT_RECIPIENTS で上書き可。
-const DEFAULT_RECIPIENTS = "info@retouch-members.com";
+const DEFAULT_RECIPIENTS = "info@retouch.salon";
 
 const schema = z.object({
   name: z.string().trim().min(1, "お名前を入力してください").max(120),

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Launch `next dev` on port 3000 when free, otherwise fall back to
- * the next available port (3001, 3002, ...). This avoids the
- * EADDRINUSE crash when another dev server is already running.
+ * 開発用。公開サイト（ポート3000 / retouch.salon）には付けない。
+ * 3001 から探し、出力先は .next-dev（本番の .next-prod とは別）。
  */
 const net = require("node:net");
 const { spawn } = require("node:child_process");
 
-const BASE_PORT = Number(process.env.PORT) || 3000;
-const MAX_TRIES = 10;
+process.env.NEXT_DIST_DIR = process.env.NEXT_DIST_DIR || ".next-dev";
+const BASE_PORT = 3001;
+const MAX_TRIES = process.argv.includes("--work") ? 1 : 10;
 
 // Probe a single host. Resolves true iff a listener can bind there.
 function isPortFreeOn(port, host) {
@@ -50,7 +50,7 @@ async function pickPort() {
 
   const nextMain = require.resolve("next/dist/bin/next");
 
-  const child = spawn(process.execPath, [nextMain, "dev", "-p", String(port)], {
+  const child = spawn(process.execPath, [nextMain, "dev", "-H", "127.0.0.1", "-p", String(port)], {
     stdio: "inherit",
     shell: false,
     env: {

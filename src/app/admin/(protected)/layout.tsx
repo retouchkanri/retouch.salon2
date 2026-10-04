@@ -14,7 +14,7 @@ export default async function ProtectedAdminLayout({ children }: { children: Rea
           while the main content scrolls; collapsible to an icon rail. It is
           the `peer` that tells <main> which left margin to use. On mobile it
           stacks above the content as a fold-out menu. */}
-      <AdminNav role={session.role} email={session.email} initialPrefs={navPrefs} />
+      <AdminNav role={session.role} initialPrefs={navPrefs} />
       <main className="p-3 md:p-4 md:ml-[240px] md:transition-[margin] md:duration-200 md:ease-out md:peer-data-[rail=true]:ml-[68px] overflow-x-auto bg-surface-soft">
         {children}
       </main>

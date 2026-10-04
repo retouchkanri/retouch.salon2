@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -8,6 +9,7 @@ import { buildRevenueSeries, type RawPayment } from "@/lib/revenueSeries";
 import { HIDDEN_ACCOUNT_EMAILS } from "@/lib/hiddenAccounts";
 import RevenueChart from "./RevenueChart";
 import horseImage from "@/assets/images/horse.png";
+import OpsSignals from "./OpsSignals";
 
 // 収益推移チャートは年・月・週・日で切替表示するため、十分に長い期間
 // （直近 5 年）の成功決済を取得する。1000 行の上限を超える可能性があるので
@@ -79,7 +81,7 @@ export default async function AdminDashboardPage() {
     fetchSucceededPayments(supabase, fiveYearsAgo.toISOString()),
     supabase
       .from("support_subscriptions")
-      .select("*, horse:horses(name), customer:customers(full_name)")
+      .select("*, horse:horses(name, image_url), customer:customers(full_name)")
       .order("created_at", { ascending: false })
       .limit(5),
     supabase
@@ -127,6 +129,10 @@ export default async function AdminDashboardPage() {
         <p className="text-xs text-ink-mute">{new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}</p>
       </div>
 
+      <Suspense fallback={null}>
+        <OpsSignals />
+      </Suspense>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((c) => {
@@ -166,12 +172,15 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* Quick links */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
         {[
           { href: "/admin/customers", label: "顧客一覧", sub: "検索・編集・履歴", icon: "https://api.iconify.design/fluent-emoji-flat/busts-in-silhouette.svg" },
           { href: "/admin/supports", label: "支援管理", sub: "馬ごと・口数・状態", icon: "https://api.iconify.design/fluent-emoji-flat/horse-face.svg" },
           { href: "/admin/contracts", label: "契約一覧", sub: "A/B/C・停止処理", icon: "https://api.iconify.design/fluent-emoji-flat/page-with-curl.svg" },
           { href: "/admin/payments", label: "決済履歴", sub: "成功・失敗・返金", icon: "https://api.iconify.design/fluent-emoji-flat/credit-card.svg" },
+          { href: "/admin/reports", label: "経営管理", sub: "会員推移・月次収支", icon: "https://api.iconify.design/fluent-emoji-flat/calendar.svg" },
+          { href: "/admin/giving", label: "寄付状況", sub: "何が増減したか", icon: "https://api.iconify.design/fluent-emoji-flat/sparkles.svg" },
+          { href: "/admin/follow-ups", label: "要フォロー", sub: "決済失敗・退会の兆候", icon: "https://api.iconify.design/fluent-emoji-flat/bell.svg" },
         ].map((l) => (
           <Link key={l.href} href={l.href} className="card !p-2.5 hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2.5 group">
             <span className="shrink-0 w-9 h-9 rounded-full bg-surface-soft flex items-center justify-center group-hover:bg-brand-50 transition-colors">
@@ -310,7 +319,7 @@ export default async function AdminDashboardPage() {
                   <span className="text-ink-mute mx-1.5">→</span>
                   {s.horse?.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.horse.image_url} alt="" className="w-6 h-6 rounded-md object-cover inline-block align-text-bottom mr-1" />
+                    <img src={s.horse.image_url} alt={s.horse?.name ?? ""} className="w-6 h-6 rounded-md object-cover inline-block align-text-bottom mr-1" />
                   ) : (
                     <Image src={horseImage} alt="" width={16} height={16} className="inline-block w-4 h-4 rounded-sm object-cover align-text-bottom mr-1" />
                   )}

@@ -16,6 +16,8 @@ export type NavItem = {
   emoji: string;
   cap?: Capability;
   external?: boolean;
+  /** 新しく足したメニュー。絵文字を揺らして知らせる。 */
+  fresh?: boolean;
 };
 
 export type NavGroup = { id: string; label: string; items: NavItem[] };
@@ -26,6 +28,8 @@ export const navGroups: NavGroup[] = [
     label: "全体",
     items: [
       { href: "/admin", label: "ダッシュボード", emoji: "📊" },
+      { href: "/admin/reports", label: "経営管理", emoji: "📅", cap: "payments.manage", fresh: true },
+      { href: "/admin/giving", label: "寄付状況", emoji: "✨", cap: "payments.manage", fresh: true },
       { href: "/admin/search", label: "横断検索", emoji: "🔍" },
       { href: "/admin/audit-logs", label: "監査ログ", emoji: "🛡️", cap: "audit.view" },
     ],
@@ -39,6 +43,7 @@ export const navGroups: NavGroup[] = [
       { href: "/admin/supports", label: "支援管理", emoji: "💝" },
       { href: "/admin/donations", label: "寄付一覧", emoji: "🎁" },
       { href: "/admin/payments", label: "決済履歴", emoji: "💳", cap: "payments.manage" },
+      { href: "/admin/follow-ups", label: "要フォロー", emoji: "❗", cap: "payments.manage", fresh: true },
     ],
   },
   {
@@ -49,6 +54,7 @@ export const navGroups: NavGroup[] = [
       { href: "/guide", label: "入会案内（公開）", emoji: "📖", external: true },
       { href: "/support-guide", label: "1口支援案内（公開）", emoji: "🌱", external: true },
       { href: "/admin/horses", label: "馬マスタ", emoji: "🐴" },
+      { href: "/admin/horse-reports", label: "馬の報告", emoji: "⭐", fresh: true },
       { href: "/admin/events", label: "イベントマスタ", emoji: "🎉" },
       { href: "/admin/bookings", label: "予約管理", emoji: "🗓️" },
       { href: "/admin/horse-meetings", label: "馬の面会", emoji: "🥕" },

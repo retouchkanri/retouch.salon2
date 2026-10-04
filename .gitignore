@@ -1,6 +1,8 @@
 node_modules/
 .claude/
 .next/
+.next-dev/
+.next-prod/
 out/
 dist/
 .env

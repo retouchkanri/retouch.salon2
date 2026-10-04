@@ -266,6 +266,30 @@ export default async function MyPageTop() {
       <section>
         <h2 className="section-title">お知らせ</h2>
         <div className="grid sm:grid-cols-2 gap-4">
+          <Link href="/mypage/reports" className="card hover:shadow-lg transition-shadow group">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-brand-50 group-hover:bg-brand-100 flex items-center justify-center text-2xl transition-colors shrink-0">
+                📅
+              </div>
+              <div>
+                <p className="text-xs text-ink-mute mb-0.5">月ごとの使いみち</p>
+                <p className="text-lg font-bold">収支報告</p>
+                <p className="text-xs text-ink-soft mt-0.5">公開された月の収支を確認できます。</p>
+              </div>
+            </div>
+          </Link>
+          <Link href="/mypage/horse-reports" className="card hover:shadow-lg transition-shadow group">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-brand-50 group-hover:bg-brand-100 flex items-center justify-center text-2xl transition-colors shrink-0">
+                ⭐
+              </div>
+              <div>
+                <p className="text-xs text-ink-mute mb-0.5">馬の近況</p>
+                <p className="text-lg font-bold">馬の月次報告</p>
+                <p className="text-xs text-ink-soft mt-0.5">公開された馬の報告を読めます。</p>
+              </div>
+            </div>
+          </Link>
           <Link href="/mypage/announcements" className="card hover:shadow-lg transition-shadow group">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-brand-50 group-hover:bg-brand-100 flex items-center justify-center text-2xl transition-colors shrink-0">

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type SetAllCookies } from "@supabase/ssr";
-import { safeGetUser } from "@/lib/supabase/safe-auth";
+import { isStaleSessionError, safeGetUser } from "@/lib/supabase/safe-auth";
 
 const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit) => {
   const timeoutPromise = new Promise<Response>((resolve) => {
@@ -32,6 +32,10 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  const secure =
+    request.nextUrl.protocol === "https:" ||
+    request.headers.get("x-forwarded-proto") === "https";
+
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     global: { fetch: fetchWithTimeout },
     cookies: {
@@ -54,7 +58,27 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  await safeGetUser(supabase);
+  const staleCookieNames = request.cookies
+    .getAll()
+    .map((cookie) => cookie.name)
+    .filter(
+      (name) =>
+        name.startsWith("sb-") &&
+        (name.includes("auth-token") || name.includes("code-verifier")),
+    );
+  const { error } = await safeGetUser(supabase);
+  // A revoked refresh token is not a server failure. Drop the dead cookies so
+  // the browser stops sending them on every later request.
+  if (isStaleSessionError(error)) {
+    for (const name of staleCookieNames) {
+      response.cookies.set(name, "", {
+        path: "/",
+        maxAge: 0,
+        sameSite: "lax",
+        secure,
+      });
+    }
+  }
   return response;
 }
 

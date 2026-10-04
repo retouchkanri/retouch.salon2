@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.js",
+    "dev:3001": "node scripts/dev.js --work",
     "dev:strict": "next dev -p 3000",
     "build": "next build",
+    "build:live": "node scripts/live.js build",
+    "start:live": "node scripts/live.js start",
     "check": "tsc --noEmit && next lint",
     "start": "next start -p 3000",
     "lint": "next lint",
@@ -17,7 +20,8 @@
     "smtp:probe": "tsx scripts/smtp-probe.ts",
     "template:test": "tsx scripts/send-template-test.ts",
     "test": "tsx --test tests/**/*.test.ts",
-    "preflight": "tsx scripts/preflight.ts"
+    "preflight": "tsx scripts/preflight.ts",
+    "db:apply": "node scripts/apply-newhorse.mjs"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",

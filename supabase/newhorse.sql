@@ -178,3 +178,43 @@ update public.support_subscriptions
 set stripe_subscription_item_id = 'si_V9JPkaYk2pBLkr', status = 'active', canceled_at = null
 where id = 'ac665424-7f79-47de-9971-86a87a335462'
   and stripe_subscription_item_id is null;
+
+-- =====================================================================
+-- 経営管理の月次収支報告（2026-10-03）
+--
+-- これ以降のデータベース追加は、このファイルの末尾に足す。
+-- 公開済みの数字は snapshot に固定する。会員画面は service role 経由でのみ読む。
+-- 再実行しても安全（テーブルが既にあれば何もしない）。
+-- =====================================================================
+create table if not exists public.monthly_reports (
+  year_month text primary key check (year_month ~ '^\d{4}-\d{2}$'),
+  expenses jsonb not null default '{}'::jsonb,
+  horse_count integer check (horse_count is null or horse_count >= 0),
+  note text,
+  published_at timestamptz,
+  snapshot jsonb,
+  updated_at timestamptz not null default now(),
+  updated_by uuid
+);
+
+alter table public.monthly_reports enable row level security;
+
+-- =====================================================================
+-- 馬の月次報告（2026-10-03）
+-- スタッフの近況・写真と、会員に公開する文章。再実行しても安全。
+-- =====================================================================
+create table if not exists public.horse_reports (
+  id uuid primary key default gen_random_uuid(),
+  horse_id uuid not null references public.horses(id) on delete cascade,
+  year_month text not null check (year_month ~ '^\d{4}-\d{2}$'),
+  staff_note text,
+  photo_urls jsonb not null default '[]'::jsonb,
+  body text,
+  life_story text,
+  published_at timestamptz,
+  updated_at timestamptz not null default now(),
+  updated_by uuid,
+  unique (horse_id, year_month)
+);
+
+alter table public.horse_reports enable row level security;

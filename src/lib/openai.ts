@@ -62,3 +62,43 @@ export async function chatComplete(
   if (typeof content !== "string") throw new Error("openai chat: invalid response");
   return content.trim();
 }
+
+/**
+ * 日本人女性の人事担当のような、やわらかくゆっくりした声で読み上げ、mp3 を返す。
+ * 速度は 1 より遅くする（0.8）。
+ */
+export async function speakJapanese(text: string, apiKey: string): Promise<ArrayBuffer> {
+  const input = text.replace(/\s+/g, " ").trim().slice(0, 800);
+  const instructions =
+    "話者は日本人の女性だけです。男性、子ども、ニュースのアナウンサーの声にはしないでください。" +
+    "大阪の事務所で応募者を迎える人事担当者のように、やわらかく低すぎない声で、人に語りかけてください。" +
+    "速度はゆっくりです。文の区切りで少し間を置き、語尾を上げ下げして自然な抑揚をつけてください。" +
+    "丁寧な共通語を土台に、関西の事務所で話すようなやわらかい話し言葉の調子を軽く交えてください。" +
+    "強い方言やお笑いの口調、棒読みは使わないでください。";
+  const attempts = [
+    { model: "gpt-4o-mini-tts", voice: "shimmer", instructions, speed: 0.8 },
+    { model: "gpt-4o-mini-tts", voice: "coral", instructions, speed: 0.8 },
+    { model: "tts-1", voice: "nova", speed: 0.8 },
+  ];
+  let last = "openai speech failed";
+  for (const attempt of attempts) {
+    const res = await fetch(`${OPENAI_BASE}/audio/speech`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: attempt.model,
+        voice: attempt.voice,
+        input,
+        response_format: "mp3",
+        speed: attempt.speed,
+        ...(attempt.instructions ? { instructions: attempt.instructions } : {}),
+      }),
+    });
+    if (res.ok) return res.arrayBuffer();
+    last = `openai speech ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`;
+  }
+  throw new Error(last);
+}

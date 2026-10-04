@@ -5,6 +5,8 @@ import Image from "next/image";
 import doImage from "@/assets/images/do.png";
 import { ADMIN_AVATAR_URL } from "@/lib/avatarUrls";
 import CommunityNavLink from "@/components/community/CommunityNavLink";
+import { fallbackChatReply, withCurrentContactEmail } from "@/lib/chatFallback";
+import { readTranscript, type SpeechResult, VOICE_SILENCE_MS, watchVoiceSilence } from "@/lib/voiceCapture";
 
 type Message = { from: "bot" | "user"; text: string };
 
@@ -31,23 +33,38 @@ const INITIAL_MESSAGES: Message[] = [
   { from: "bot", text: "こんにちは！Retouchサポートです。引退競走馬支援についてお気軽にご質問ください。" },
 ];
 
-function getBotReply(input: string): string {
-  const t = input.trim().toLowerCase();
-  if (/会員|登録|入会/.test(t))
-    return "会員登録は無料です。トップページの「無料で会員登録する」ボタンからお手続きいただけます。";
-  if (/寄付|支援|donation/.test(t))
-    return "単発寄付は /donate ページから、月次サポートは会員登録後のマイページからお手続きいただけます。";
-  if (/退会|解約|キャンセル/.test(t))
-    return "退会はマイページ > アカウント設定からいつでも手続きできます。";
-  if (/馬|horse/.test(t))
-    return "現在支援している馬の情報はマイページでご確認いただけます。詳しくは support@retouch-members.com までどうぞ。";
-  if (/料金|プラン|fee|price/.test(t))
-    return "月次サポートプランは複数ご用意しています。会員登録後のマイページでプランをご選択いただけます。";
-  if (/問い合わせ|連絡|contact/.test(t))
-    return "お問い合わせは support@retouch-members.com または お問い合わせフォームからお送りください。営業日24時間以内にご返信します。";
-  if (/ありがとう|thank/.test(t))
-    return "こちらこそ、引退競走馬への温かいご支援ありがとうございます！";
-  return "ご質問ありがとうございます。さらに詳しい内容は support@retouch-members.com までお問い合わせいただくか、お問い合わせフォームをご利用ください。";
+const CHATBOT_IMAGE = "/avatars/chatbot.png";
+
+type SpeechRec = {
+  lang: string;
+  interimResults: boolean;
+  continuous: boolean;
+  onresult: ((event: { results: ArrayLike<SpeechResult> }) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+function speechRecognition(): (new () => SpeechRec) | null {
+  if (typeof window === "undefined") return null;
+  const host = window as Window & { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
+  return host.SpeechRecognition ?? host.webkitSpeechRecognition ?? null;
+}
+
+function speakWithBrowser(text: string) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "ja-JP";
+  utterance.rate = 0.82;
+  utterance.pitch = 1.05;
+  const voices = window.speechSynthesis.getVoices();
+  const voice = voices.find((item) => /ja[-_]JP/i.test(item.lang) && /nanami|ayumi|haruka|sayaka|ichigo/i.test(item.name))
+    ?? voices.find((item) => /ja[-_]JP/i.test(item.lang) && !/ichiro|keita/i.test(item.name));
+  if (voice) utterance.voice = voice;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
 }
 
 export default function BottomRightPanel({
@@ -66,7 +83,18 @@ export default function BottomRightPanel({
   const [isTyping, setIsTyping] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [memberAvatarUrl, setMemberAvatarUrl] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [liveSpeech, setLiveSpeech] = useState<{ committed: string; pending: string } | null>(null);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const recognitionRef = useRef<SpeechRec | null>(null);
+  const chatOpenRef = useRef(false);
+  const transcriptRef = useRef("");
+  const cancelVoiceRef = useRef(false);
+  const silenceWatchRef = useRef<(() => void) | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const fallbackSilenceRef = useRef<number | null>(null);
 
   /** ログイン中は会員アバター、未ログインは管理者アバター。 */
   const participantAvatarUrl = loggedIn
@@ -89,7 +117,56 @@ export default function BottomRightPanel({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping]);
+  }, [messages, isTyping, liveSpeech]);
+
+  useEffect(() => {
+    chatOpenRef.current = chatOpen;
+    if (!chatOpen) {
+      stopSpeaking();
+      cancelVoiceInput();
+      return;
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setChatOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [chatOpen]);
+
+  function stopSpeaking() {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+  }
+
+  async function speakReply(text: string) {
+    if (!chatOpenRef.current) return;
+    stopSpeaking();
+    try {
+      const res = await fetch("/api/chat/speech", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!chatOpenRef.current) return;
+      if (res.ok) {
+        const url = URL.createObjectURL(await res.blob());
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => URL.revokeObjectURL(url);
+        await audio.play();
+        return;
+      }
+    } catch {
+      // ブラウザの日本語音声へ
+    }
+    if (chatOpenRef.current) speakWithBrowser(text);
+  }
 
   // AIチャットAPI（/api/chat）に問い合わせ、未設定・エラー時は簡易応答にフォールバック。
   async function fetchBotReply(text: string, history: Message[]): Promise<string> {
@@ -106,12 +183,12 @@ export default function BottomRightPanel({
       });
       if (res.ok) {
         const j = await res.json();
-        if (j?.ok && typeof j.answer === "string" && j.answer.trim()) return j.answer;
+        if (j?.ok && typeof j.answer === "string" && j.answer.trim()) return withCurrentContactEmail(j.answer);
       }
     } catch {
       // ネットワークエラー等はフォールバックへ
     }
-    return getBotReply(text);
+    return fallbackChatReply(text);
   }
 
   function respond(raw: string) {
@@ -124,7 +201,131 @@ export default function BottomRightPanel({
     fetchBotReply(text, history).then((reply) => {
       setIsTyping(false);
       setMessages((prev) => [...prev, { from: "bot", text: reply }]);
+      void speakReply(reply);
     });
+  }
+
+  function releaseSilenceWatch() {
+    silenceWatchRef.current?.();
+    silenceWatchRef.current = null;
+    micStreamRef.current?.getTracks().forEach((track) => track.stop());
+    micStreamRef.current = null;
+    if (fallbackSilenceRef.current != null) {
+      window.clearTimeout(fallbackSilenceRef.current);
+      fallbackSilenceRef.current = null;
+    }
+  }
+
+  function cancelVoiceInput() {
+    cancelVoiceRef.current = true;
+    transcriptRef.current = "";
+    setLiveSpeech(null);
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    try {
+      recognition?.abort();
+    } catch {
+      // すでに止まっている場合はそのまま閉じる
+    }
+    releaseSilenceWatch();
+    setListening(false);
+  }
+
+  function armFallbackSilence() {
+    if (fallbackSilenceRef.current != null) window.clearTimeout(fallbackSilenceRef.current);
+    fallbackSilenceRef.current = window.setTimeout(() => {
+      fallbackSilenceRef.current = null;
+      const recognition = recognitionRef.current;
+      try {
+        recognition?.stop();
+      } catch {
+        recognition?.abort();
+      }
+    }, VOICE_SILENCE_MS);
+  }
+
+  async function toggleVoice() {
+    if (listening) {
+      cancelVoiceInput();
+      return;
+    }
+    const Ctor = speechRecognition();
+    if (!Ctor) {
+      setVoiceNote("このブラウザでは音声入力が使えません。");
+      return;
+    }
+    stopSpeaking();
+    const recognition = new Ctor();
+    recognition.lang = "ja-JP";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    let delivered = false;
+    recognition.onresult = (event) => {
+      const heard = readTranscript(event.results);
+      transcriptRef.current = heard.text;
+      setLiveSpeech(heard.text ? { committed: heard.committed, pending: heard.pending } : null);
+      if (!silenceWatchRef.current) armFallbackSilence();
+    };
+    recognition.onerror = (event) => {
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      cancelVoiceRef.current = true;
+      setVoiceNote("音声を聞き取れませんでした。もう一度話してください。");
+      try {
+        recognition.stop();
+      } catch {
+        recognition.abort();
+      }
+    };
+    recognition.onend = () => {
+      releaseSilenceWatch();
+      recognitionRef.current = null;
+      setListening(false);
+      if (cancelVoiceRef.current) {
+        cancelVoiceRef.current = false;
+        transcriptRef.current = "";
+        setLiveSpeech(null);
+        return;
+      }
+      if (delivered) return;
+      delivered = true;
+      const transcript = transcriptRef.current.trim();
+      transcriptRef.current = "";
+      setLiveSpeech(null);
+      if (transcript) respond(transcript);
+      else setVoiceNote("音声を聞き取れませんでした。もう一度話してください。");
+    };
+    recognitionRef.current = recognition;
+    transcriptRef.current = "";
+    cancelVoiceRef.current = false;
+    setVoiceNote(null);
+    setListening(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+      if (cancelVoiceRef.current || recognitionRef.current !== recognition) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      micStreamRef.current = stream;
+      silenceWatchRef.current = watchVoiceSilence(stream, () => {
+        try {
+          recognition.stop();
+        } catch {
+          recognition.abort();
+        }
+      });
+    } catch {
+      armFallbackSilence();
+    }
+    try {
+      recognition.start();
+    } catch {
+      releaseSilenceWatch();
+      recognitionRef.current = null;
+      setListening(false);
+      setVoiceNote("マイクを開始できませんでした。");
+    }
   }
 
   function sendMessage() {
@@ -227,9 +428,19 @@ export default function BottomRightPanel({
         </button>
       </div>
 
-      {/* ── Chat popup ── */}
+      {/* ── Chat modal（画面中央） ── */}
       {showChat && chatOpen && (
-        <div className="fixed bottom-36 right-4 z-50 w-[min(20rem,calc(100vw-1.5rem))] sm:w-96 flex flex-col bg-white rounded-2xl shadow-2xl border border-surface-line overflow-hidden animate-[scaleIn_200ms_ease] max-md:bottom-[12.5rem] max-md:right-2">
+        <div
+          className="fixed inset-0 z-[140] flex items-center justify-center bg-ink/40 p-4 sm:p-6"
+          onClick={() => setChatOpen(false)}
+        >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Retouchサポート"
+          className="flex h-[min(40rem,calc(100dvh-2rem))] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-surface-line bg-white shadow-2xl animate-[scaleIn_200ms_ease]"
+          onClick={(event) => event.stopPropagation()}
+        >
           {/* Header */}
           <div className="bg-brand px-4 py-3 flex items-center gap-3">
             <ChatAvatar
@@ -239,7 +450,7 @@ export default function BottomRightPanel({
             />
             <div className="flex-1 min-w-0">
               <p className="text-white font-bold text-sm leading-none">Retouchサポート</p>
-              <p className="text-white/70 text-xs mt-0.5">自動返答チャット</p>
+              <p className="text-white/70 text-xs mt-0.5">声でも話せるサポート</p>
             </div>
             <button
               onClick={() => setChatOpen(false)}
@@ -252,8 +463,15 @@ export default function BottomRightPanel({
             </button>
           </div>
 
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={CHATBOT_IMAGE}
+            alt="Retouchサポート"
+            className="h-40 w-full shrink-0 object-cover object-[center_18%] sm:h-48"
+          />
+
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-72 bg-surface-soft">
+          <div className="min-h-0 flex-1 overflow-y-auto space-y-3 bg-surface-soft p-4 sm:p-5">
             {messages.map((m, i) => (
               <div key={i} className={`flex items-start ${m.from === "user" ? "justify-end" : "justify-start"}`}>
                 {m.from === "bot" && (
@@ -264,7 +482,7 @@ export default function BottomRightPanel({
                   />
                 )}
                 <div
-                  className={`max-w-[75%] px-3 py-2 rounded-2xl text-xs leading-relaxed ${
+                  className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${
                     m.from === "user"
                       ? "bg-brand text-white rounded-br-sm"
                       : "bg-white text-ink shadow-sm rounded-bl-sm border border-surface-line"
@@ -281,6 +499,19 @@ export default function BottomRightPanel({
                 )}
               </div>
             ))}
+            {liveSpeech && (liveSpeech.committed || liveSpeech.pending) && (
+              <div className="flex items-start justify-end" aria-live="polite">
+                <div className="max-w-[75%] px-3 py-2 rounded-2xl rounded-br-sm bg-brand text-sm leading-relaxed text-white">
+                  {liveSpeech.committed}
+                  {liveSpeech.pending ? <span className="opacity-70">{liveSpeech.pending}</span> : null}
+                </div>
+                <ChatAvatar
+                  src={participantAvatarUrl}
+                  alt={loggedIn ? "あなた" : "ゲスト"}
+                  className="ml-2 mt-0.5"
+                />
+              </div>
+            )}
             {isTyping && (
               <div className="flex justify-start items-start">
                 <ChatAvatar
@@ -313,6 +544,26 @@ export default function BottomRightPanel({
 
           {/* Input */}
           <div className="p-3 flex gap-2 bg-white border-t border-surface-line">
+            <button
+              type="button"
+              onClick={toggleVoice}
+              disabled={isTyping}
+              aria-pressed={listening}
+              aria-label={listening ? "録音中。音声入力を止める" : "日本語で話す"}
+              className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${listening ? "bg-rose-600 text-white" : "bg-brand-50 text-brand hover:bg-brand-100"}`}
+            >
+              {listening ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+                  <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <circle cx="12" cy="12" r="3.5" fill="currentColor" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="2" />
+                  <path d="M6 11a6 6 0 0012 0M12 17v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
             <input
               type="text"
               value={input}
@@ -332,6 +583,10 @@ export default function BottomRightPanel({
               </svg>
             </button>
           </div>
+          {listening || voiceNote ? (
+            <p className="px-4 pb-3 -mt-1 text-[11px] text-ink-soft bg-white">{listening ? "話している内容を表示しています。聞き取りが直ると、その場で書き換わります。" : voiceNote}</p>
+          ) : null}
+        </div>
         </div>
       )}
     </>

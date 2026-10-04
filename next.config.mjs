@@ -13,6 +13,9 @@ const siteHost = (() => {
 const nextConfig = {
   reactStrictMode: true,
   optimizeFonts: false,
+  // 公開（ポート3000）は .next、修正用（ポート3001）は .next-dev。
+  // 同じ出力先を共有すると、修正中の再コンパイルで公開側が落ちる。
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Typecheck + lint run via `prebuild` (tsc + next lint) so the build
   // worker pool does not OOM on memory-constrained Windows hosts.
   eslint: { ignoreDuringBuilds: true },
@@ -20,7 +23,9 @@ const nextConfig = {
   experimental: {
     cpus: 1,
     serverActions: {
-      allowedOrigins: Array.from(new Set(["localhost:3000", siteHost])),
+      allowedOrigins: Array.from(
+        new Set(["localhost:3000", "localhost:3001", "retouch.salon", "www.retouch.salon", siteHost]),
+      ),
     },
   },
   // 絵文字画像（ファイル名＝コードポイントで内容は変わらない）はブラウザに長くキャッシュさせる
@@ -33,6 +38,10 @@ const nextConfig = {
     ];
   },
   images: {
+    // 数MBのPNGを /_next/image で変換すると、この環境では
+    // 「Unable to optimize image」と digest の TypeError が出て表示が壊れる。
+    // 元画像をそのまま配信する。
+    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "**.supabase.co" },
       { protocol: "https", hostname: "retouch-members.com" },
@@ -52,6 +61,8 @@ const nextConfig = {
           "**/node_modules/**",
           "**/.git/**",
           "**/.next/**",
+          "**/.next-dev/**",
+          "**/.next-prod/**",
           "**/horseimage/**",
           "**/backups/**",
         ],
