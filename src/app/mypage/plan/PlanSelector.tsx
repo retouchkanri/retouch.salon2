@@ -18,7 +18,7 @@ type Props = {
   disabled: boolean;
 };
 
-function PlanSelector({ plans, currentPlanId, disabled }: Props) {
+export default function PlanSelector({ plans, currentPlanId, disabled }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +95,10 @@ function PlanSelector({ plans, currentPlanId, disabled }: Props) {
   );
 }
 
-function CancelButton() {
+// サーバーコンポーネントから使うため、独立した名前付きエクスポートにする。
+// 「PlanSelector.Cancel = ...」のように関数へ後付けした値は、本番ビルドの
+// クライアントマニフェストに載らず描画エラーになる。
+export function PlanCancelButton() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -140,7 +143,3 @@ function CancelButton() {
     </div>
   );
 }
-
-PlanSelector.Cancel = CancelButton;
-
-export default PlanSelector;

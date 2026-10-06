@@ -32,7 +32,7 @@ export default async function MemberHorseReportsPage() {
           })}
         </ul>
       )}
-      <Link href="/mypage/reports" className="text-sm text-brand underline">収支報告を見る</Link>
+      <Link href="/mypage/reports" className="text-sm text-brand underline">決済報告を見る</Link>
     </div>
   );
 }

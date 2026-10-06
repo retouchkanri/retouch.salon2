@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "./supabase/server";
 import { isBasicMemberPlanCode } from "./constraints";
 import { fetchAllRows } from "./fetchAll";
+import { canonicalPayments } from "./paymentRows";
 import type {
   Booking,
   Contract,
@@ -111,12 +112,13 @@ export async function loadPayments(customerId: string, limit: number | null = 20
       .eq("customer_id", customerId)
       .order("occurred_at", { ascending: false })
       .order("id", { ascending: true });
+  // 同じ決済が Webhook と Stripe 同期の2行で入るので、1 件 1 行にそろえて返す。
   if (limit == null) {
     const { rows } = await fetchAllRows<Payment>((from, to) => base().range(from, to));
-    return rows;
+    return canonicalPayments(rows);
   }
-  const { data } = await base().limit(limit);
-  return (data as Payment[] | null) ?? [];
+  const { data } = await base().limit(limit * 2);
+  return canonicalPayments((data as Payment[] | null) ?? []).slice(0, limit);
 }
 
 export async function loadHorses(onlySupportable = true): Promise<Horse[]> {

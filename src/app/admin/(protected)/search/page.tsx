@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatDate, formatYen, statusLabel } from "@/lib/format";
 import { isHiddenAccountEmail } from "@/lib/hiddenAccounts";
+import { CANONICAL_PAYMENTS_FILTER } from "@/lib/paymentRows";
 
 export const dynamic = "force-dynamic";
 
@@ -245,6 +246,8 @@ export default async function AdminSearchPage({
             { count: "exact" },
           )
           .or(orParts.join(","))
+          // Webhook の控えの行は出さない（同じ決済が2行になる）。
+          .or(CANONICAL_PAYMENTS_FILTER)
           .order("occurred_at", { ascending: false })
           .limit(200);
         payments = (data as AnyRow[]) ?? [];

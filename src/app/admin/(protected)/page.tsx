@@ -6,7 +6,9 @@ import { formatDate, formatYen } from "@/lib/format";
 import { syncStripePayments } from "@/lib/stripeSync";
 import { reconcileSubscriptionStatuses } from "@/lib/stripeReconcile";
 import { buildRevenueSeries, type RawPayment } from "@/lib/revenueSeries";
+import { currentYearMonth, monthStart, stripeReceipts, type PaymentRow } from "@/lib/monthlyReport";
 import { HIDDEN_ACCOUNT_EMAILS } from "@/lib/hiddenAccounts";
+import { CANONICAL_PAYMENTS_FILTER } from "@/lib/paymentRows";
 import RevenueChart from "./RevenueChart";
 import horseImage from "@/assets/images/horse.png";
 import OpsSignals from "./OpsSignals";
@@ -14,25 +16,44 @@ import OpsSignals from "./OpsSignals";
 // 収益推移チャートは年・月・週・日で切替表示するため、十分に長い期間
 // （直近 5 年）の成功決済を取得する。1000 行の上限を超える可能性があるので
 // ページングして全件取得する。
+//
+// チャートは Stripe の売上（決済された額そのまま。返金・手数料を引く前）を、Stripe の支払い 1 件ごとに数える。
+// 同じ Stripe の決済が Webhook と Stripe 同期の2行で入るため、行をそのまま足すと二重になる
+// （2026-10 に Stripe と照合：10月は Stripe ¥418,400 に対し、行の合計は ¥806,600）。
+// 後から返金した決済も、Stripe と同じく決済された日の売上に入る。銀行振込の寄付は Stripe を通らないので入らない。
 async function fetchSucceededPayments(
   supabase: ReturnType<typeof createSupabaseServerClient>,
   sinceISO: string,
 ): Promise<RawPayment[]> {
   const pageSize = 1000;
-  const rows: RawPayment[] = [];
+  const rows: PaymentRow[] = [];
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
       .from("payments")
-      .select("occurred_at, amount")
-      .eq("status", "succeeded")
+      .select("occurred_at, amount, status, kind, stripe_invoice_id, stripe_payment_intent_id, stripe_charge_id")
+      .in("status", ["succeeded", "refunded"])
       .gte("occurred_at", sinceISO)
-      .order("occurred_at", { ascending: true })
+      .order("id")
       .range(from, from + pageSize - 1);
     if (error || !data || data.length === 0) break;
-    rows.push(...(data as RawPayment[]));
+    for (const row of data) {
+      rows.push({
+        amount: row.amount,
+        status: row.status,
+        kind: row.kind,
+        occurred_at: row.occurred_at,
+        contract_id: null,
+        invoice_id: row.stripe_invoice_id,
+        payment_intent_id: row.stripe_payment_intent_id,
+        charge_id: row.stripe_charge_id,
+      });
+    }
     if (data.length < pageSize) break;
   }
-  return rows;
+  return stripeReceipts({ payments: rows, contracts: [], donations: [] }).map((receipt) => ({
+    occurred_at: new Date(receipt.at).toISOString(),
+    amount: receipt.amount,
+  }));
 }
 
 export default async function AdminDashboardPage() {
@@ -47,6 +68,10 @@ export default async function AdminDashboardPage() {
 
   const fiveYearsAgo = new Date();
   fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+  const now = new Date();
+  const [year, month] = currentYearMonth(now).split("-").map(Number);
+  const monthStartIso = monthStart(year, month).toISOString();
+  const previousMonthIso = (month === 1 ? monthStart(year - 1, 12) : monthStart(year, month - 1)).toISOString();
 
   const [
     { count: customersTotalRaw },
@@ -54,11 +79,15 @@ export default async function AdminDashboardPage() {
     { count: pastDueCount },
     { count: activeContracts },
     { count: canceledContracts },
-    { count: bookingsToday },
     { data: recentPayments },
     revenuePayments,
     { data: recentSupports },
     { data: upcomingEvents },
+    { count: joinedThisMonth },
+    { count: contractsStartedThisMonth },
+    { count: bookingsLastMonth },
+    { count: bookingsThisMonth },
+    { data: pastDueRows },
   ] = await Promise.all([
     supabase.from("customers").select("*", { count: "exact", head: true }),
     // 内部テスト用アカウント分を会員数から差し引くためのカウント。
@@ -70,12 +99,10 @@ export default async function AdminDashboardPage() {
     supabase.from("contracts").select("*", { count: "exact", head: true }).eq("status", "active"),
     supabase.from("contracts").select("*", { count: "exact", head: true }).eq("status", "canceled"),
     supabase
-      .from("bookings")
-      .select("*", { count: "exact", head: true })
-      .gte("booked_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
-    supabase
       .from("payments")
       .select("*, customer:customers(full_name,email)")
+      // Webhook の控えの行は出さない（同じ決済が2行になる）。
+      .or(CANONICAL_PAYMENTS_FILTER)
       .order("occurred_at", { ascending: false })
       .limit(5),
     fetchSucceededPayments(supabase, fiveYearsAgo.toISOString()),
@@ -90,10 +117,66 @@ export default async function AdminDashboardPage() {
       .gte("starts_at", new Date().toISOString())
       .order("starts_at")
       .limit(5),
+    supabase
+      .from("customers")
+      .select("email", { count: "exact", head: true })
+      .or(`joined_at.gte."${monthStartIso}",and(joined_at.is.null,created_at.gte."${monthStartIso}")`)
+      .not("email", "in", `(${HIDDEN_ACCOUNT_EMAILS.join(",")})`),
+    supabase
+      .from("contracts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .gte("started_at", monthStartIso),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .gte("booked_at", previousMonthIso)
+      .lt("booked_at", monthStartIso)
+      .or("status.is.null,status.neq.canceled"),
+    supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .gte("booked_at", monthStartIso)
+      .or("status.is.null,status.neq.canceled"),
+    supabase.from("contracts").select("customer_id, started_at").eq("status", "past_due"),
   ]);
 
   // 会員数は内部テスト用アカウントを除いた数を表示する（顧客一覧と一致）。
   const customersTotal = Math.max(0, (customersTotalRaw ?? 0) - (hiddenCustomers ?? 0));
+  const membersAdded = joinedThisMonth ?? 0;
+  const contractsAdded = contractsStartedThisMonth ?? 0;
+
+  const failingRows = pastDueRows ?? [];
+  const failingIds = [...new Set(failingRows.map((row) => row.customer_id).filter((id): id is string => !!id))];
+  const failurePayments: { customer_id: string | null; occurred_at: string }[] = [];
+  if (failingIds.length > 0) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("payments")
+        .select("customer_id, occurred_at")
+        .eq("status", "failed")
+        .in("customer_id", failingIds)
+        .order("id")
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      failurePayments.push(...data);
+      if (data.length < 1000) break;
+    }
+  }
+  const failureTiming = new Map<string, { before: boolean; during: boolean }>();
+  for (const payment of failurePayments) {
+    if (!payment.customer_id) continue;
+    const timing = failureTiming.get(payment.customer_id) ?? { before: false, during: false };
+    if (payment.occurred_at < monthStartIso) timing.before = true;
+    else timing.during = true;
+    failureTiming.set(payment.customer_id, timing);
+  }
+  const failuresAdded = failingRows.filter((row) => {
+    const timing = row.customer_id ? failureTiming.get(row.customer_id) : undefined;
+    if (timing?.before) return false;
+    return !!timing?.during || (row.started_at ?? "") >= monthStartIso;
+  }).length;
+  const failuresBefore = failingRows.length - failuresAdded;
 
   // ── Revenue chart series (day / week / month / year) ──
   const revenueSeries = buildRevenueSeries(revenuePayments);
@@ -107,19 +190,55 @@ export default async function AdminDashboardPage() {
   const activeOffset = C / 4; // start at top
 
   const cards = [
-    { label: "会員数", value: customersTotal ?? 0, href: "/admin/customers", icon: "https://api.iconify.design/fluent-emoji-flat/bust-in-silhouette.svg", sub: "登録済み", accentBar: "from-emerald-400 to-emerald-600", iconBg: "bg-emerald-50" },
-    { label: "継続契約", value: activeContracts ?? 0, href: "/admin/contracts", icon: "https://api.iconify.design/fluent-emoji-flat/page-facing-up.svg", sub: "有効中", accentBar: "from-sky-400 to-sky-600", iconBg: "bg-sky-50" },
+    {
+      label: "会員数",
+      previous: Math.max(0, customersTotal - membersAdded),
+      added: membersAdded,
+      href: "/admin/customers",
+      icon: "https://api.iconify.design/fluent-emoji-flat/bust-in-silhouette.svg",
+      baseText: "先月までの登録",
+      addedText: "今月の新規",
+      plusClass: "text-emerald-600",
+      accentBar: "from-emerald-400 to-emerald-600",
+      iconBg: "bg-emerald-50",
+    },
+    {
+      label: "継続契約",
+      previous: Math.max(0, (activeContracts ?? 0) - contractsAdded),
+      added: contractsAdded,
+      href: "/admin/contracts",
+      icon: "https://api.iconify.design/fluent-emoji-flat/page-facing-up.svg",
+      baseText: "先月までに開始",
+      addedText: "今月の開始",
+      plusClass: "text-sky-600",
+      accentBar: "from-sky-400 to-sky-600",
+      iconBg: "bg-sky-50",
+    },
     {
       label: "決済失敗",
-      value: pastDueCount ?? 0,
+      previous: failuresBefore,
+      added: failuresAdded,
       warn: (pastDueCount ?? 0) > 0,
       href: "/admin/payments?status=failed",
       icon: "https://api.iconify.design/fluent-emoji-flat/warning.svg",
-      sub: "要対応",
+      baseText: "先月までの失敗",
+      addedText: "今月の新規",
+      plusClass: "text-amber-600",
       accentBar: "from-amber-400 to-amber-600",
       iconBg: "bg-amber-50",
     },
-    { label: "本日の予約", value: bookingsToday ?? 0, href: "/admin/bookings", icon: "https://api.iconify.design/fluent-emoji-flat/spiral-calendar.svg", sub: "本日", accentBar: "from-violet-400 to-violet-600", iconBg: "bg-violet-50" },
+    {
+      label: "本日の予約",
+      previous: bookingsLastMonth ?? 0,
+      added: bookingsThisMonth ?? 0,
+      href: "/admin/bookings",
+      icon: "https://api.iconify.design/fluent-emoji-flat/spiral-calendar.svg",
+      baseText: "先月の予約",
+      addedText: "今月の予約",
+      plusClass: "text-violet-600",
+      accentBar: "from-violet-400 to-violet-600",
+      iconBg: "bg-violet-50",
+    },
   ];
 
   return (
@@ -143,11 +262,13 @@ export default async function AdminDashboardPage() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-[11px] font-semibold text-ink-mute mb-1 tracking-wide">{c.label}</p>
-                  <p className={`text-2xl leading-none font-bold tabular-nums ${c.warn ? "text-danger" : "text-ink"}`}>
-                    {c.value.toLocaleString()}
+                  <p className="text-2xl leading-none font-bold tabular-nums">
+                    <span className={c.warn ? "text-danger" : "text-ink"}>{c.previous.toLocaleString("ja-JP")}</span>
+                    <span className={`ml-1.5 text-lg ${c.plusClass}`}>+{c.added.toLocaleString("ja-JP")}</span>
                   </p>
-                  <p className={`text-[11px] mt-1.5 ${c.warn ? "text-danger font-semibold" : "text-ink-mute"}`}>
-                    {c.warn ? "→ 対応が必要です" : c.sub}
+                  <p className="text-[11px] mt-1.5 leading-snug">
+                    <span className={c.warn ? "text-danger" : "text-ink-mute"}>{c.baseText}</span>
+                    <span className={`font-semibold ${c.plusClass}`}> + {c.addedText}</span>
                   </p>
                 </div>
                 <span className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${c.warn ? "bg-red-50" : c.iconBg}`}>

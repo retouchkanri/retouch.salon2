@@ -3,6 +3,7 @@ import { requireCapability } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { toCsv } from "@/lib/csv";
 import { fetchAllRows } from "@/lib/fetchAll";
+import { CANONICAL_PAYMENTS_FILTER } from "@/lib/paymentRows";
 
 const EXPORT_COLUMNS = [
   "payment_id",
@@ -45,6 +46,8 @@ export async function GET() {
           "stripe_invoice_id, stripe_payment_intent_id, stripe_charge_id, raw, " +
           "customer:customers(full_name, email)",
       )
+      // Stripe の決済 1 件につき 1 行。Webhook の控えの行は出さない。
+      .or(CANONICAL_PAYMENTS_FILTER)
       .order("occurred_at", { ascending: false })
       .order("id", { ascending: true })
       .range(from, to),

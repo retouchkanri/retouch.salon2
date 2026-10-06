@@ -4,7 +4,7 @@ import { loadActiveContract, loadActiveSupports, loadPlans } from "@/lib/custome
 import { formatYen } from "@/lib/format";
 import { SPECIAL_TEAM_NEW_SIGNUPS_ENABLED, MEMBER_PLAN_SELF_SERVICE_ENABLED } from "@/lib/featureFlags";
 import SelfServiceClosedNotice from "@/components/SelfServiceClosedNotice";
-import PlanSelector from "./PlanSelector";
+import PlanSelector, { PlanCancelButton } from "./PlanSelector";
 
 export default async function PlanPage() {
   const session = await requireMember();
@@ -95,7 +95,7 @@ export default async function PlanPage() {
           <p className="text-sm text-ink-soft mb-2">
             現在のプランを停止すると、次回以降の決済が止まります。
           </p>
-          <PlanSelector.Cancel />
+          <PlanCancelButton />
         </section>
       )}
 

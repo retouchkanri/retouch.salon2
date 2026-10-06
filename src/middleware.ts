@@ -24,6 +24,13 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit) =>
 };
 
 export async function middleware(request: NextRequest) {
+  // このサイトは Server Action を使っていない。`Next-Action` ヘッダ付きの POST は、
+  // 外部からの探索リクエストか、古い画面からの送信なので、Next.js の内部エラー
+  // （Failed to find Server Action / reading 'digest'）にせず入口で 404 を返す。
+  if (request.headers.has("next-action")) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

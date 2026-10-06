@@ -2,27 +2,28 @@ import Link from "next/link";
 import { requireCapability } from "@/lib/auth";
 import { buildGivingInsight } from "@/lib/donationInsight";
 import { formatYen } from "@/lib/format";
-import { currentYearMonth, formatYearMonth, monthLabel, parseYearMonth, shiftMonth } from "@/lib/monthlyReport";
+import { SYSTEM_START_YM, currentYearMonth, formatYearMonth, monthLabel, parseYearMonth, shiftMonth } from "@/lib/monthlyReport";
 import { loadReportSource } from "@/lib/monthlyReportData";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import SignalList from "@/components/admin/SignalList";
 
 export const dynamic = "force-dynamic";
 
+// 会員サイトで集計を始めた月より前は、記録がそろっていないので選ばせない。
 function monthChoices(current: string): string[] {
   const parsed = parseYearMonth(current)!;
   return Array.from({ length: 12 }, (_, index) => {
     const point = shiftMonth(parsed.year, parsed.month, -index);
     return formatYearMonth(point.year, point.month);
-  });
+  }).filter((choice) => choice >= SYSTEM_START_YM);
 }
 
 export default async function GivingReportPage({ searchParams }: { searchParams: { ym?: string } }) {
   await requireCapability("payments.manage");
   const current = currentYearMonth();
   const requested = parseYearMonth(searchParams.ym ?? "") ? searchParams.ym! : current;
-  const ym = requested > current ? current : requested;
-  const loaded = await loadReportSource(createSupabaseAdminClient()).catch((error: unknown) => ({
+  const ym = requested > current ? current : requested < SYSTEM_START_YM ? SYSTEM_START_YM : requested;
+  const loaded = await loadReportSource(createSupabaseAdminClient(), ym).catch((error: unknown) => ({
     source: null,
     error: error instanceof Error ? error.message : "集計を読み込めませんでした。",
   }));
@@ -49,6 +50,11 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
         </div>
       </div>
       {loaded.error ? <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{loaded.error}</p> : null}
+      {ym === SYSTEM_START_YM ? (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {monthLabel(ym)}は会員サイトで集計を始めた月です。「先月」の数字は開始前の記録で、そろっていません。先月との差は参考としてご覧ください。
+        </p>
+      ) : null}
       {insight ? (
         <>
           <SignalList signals={insight.signals} bright={insight.bright} />
@@ -80,11 +86,11 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
             {incomeTotal > 0 ? (
               <div className="mt-4 flex h-3 overflow-hidden rounded-full">
                 {insight.slices.map((slice) => (
-                  <div key={slice.key} className="h-full" style={{ width: `${(slice.current / incomeTotal) * 100}%`, background: slice.key === "dues" ? "#1b4332" : slice.key === "share" ? "#2d6a4f" : slice.key === "card" ? "#52b788" : "#95d5b2" }} title={slice.label} />
+                  <div key={slice.key} className="h-full" style={{ width: `${(slice.current / incomeTotal) * 100}%`, background: slice.key === "dues" ? "#1b4332" : slice.key === "share" ? "#2d6a4f" : slice.key === "card" ? "#52b788" : slice.key === "bank" ? "#95d5b2" : "#cbd5e1" }} title={slice.label} />
                 ))}
               </div>
             ) : null}
-            <p className="mt-2 text-xs text-ink-mute">帯は今月の収入に占める割合です。左から会費、一口支援、カードの単発寄付、銀行振込です。継続支援者 {insight.current.counts.shareSupporters}名、一口の平均 {formatYen(insight.current.averageSupportYen)}。</p>
+            <p className="mt-2 text-xs text-ink-mute">帯は今月の収入に占める割合です。左から会費（リタポ・特別チームを含む）、一口支援、カードの単発寄付、銀行振込です。継続支援者 {insight.current.counts.shareSupporters}名、一口の平均 {formatYen(insight.current.averageSupportYen)}。</p>
           </section>
           <section className="grid md:grid-cols-2 gap-4">
             <div className="card">

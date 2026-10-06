@@ -273,8 +273,8 @@ export default async function MyPageTop() {
               </div>
               <div>
                 <p className="text-xs text-ink-mute mb-0.5">月ごとの使いみち</p>
-                <p className="text-lg font-bold">収支報告</p>
-                <p className="text-xs text-ink-soft mt-0.5">公開された月の収支を確認できます。</p>
+                <p className="text-lg font-bold">決済報告</p>
+                <p className="text-xs text-ink-soft mt-0.5">公開された月の決済報告を確認できます。</p>
               </div>
             </div>
           </Link>

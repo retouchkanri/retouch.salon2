@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { niceScale, shortValue } from "@/components/reports/chartScale";
+import { formatYen } from "@/lib/format";
 import type { MonthReport } from "@/lib/monthlyReport";
 
 type Point = MonthReport["series"][number];
 type Kind = "line" | "bar" | "pie";
 
 const SERIES = [
-  { title: "会員数（直近6か月）", pick: (point: Point) => point.members, money: false },
+  { title: "会員数", pick: (point: Point) => point.members, money: false },
   { title: "一口支援の月額", pick: (point: Point) => point.supportYen, money: true },
   { title: "単発寄付（着金・決済済）", pick: (point: Point) => point.donationYen, money: true },
 ] as const;
@@ -16,28 +18,11 @@ const PIE_COLORS = ["#1b4332", "#2d6a4f", "#40916c", "#52b788", "#74c69d", "#95d
 const AXIS = "#94a3b8";
 const GRID = "#e7ece9";
 
-function shortValue(value: number, money: boolean): string {
-  if (!money) return Math.round(value).toLocaleString("ja-JP");
-  if (Math.abs(value) >= 10000) {
-    const man = value / 10000;
-    const digits = man >= 100 ? 0 : 1;
-    return `${man.toFixed(digits).replace(/\.0$/, "")}万`;
-  }
-  return Math.round(value).toLocaleString("ja-JP");
-}
-
-function niceScale(max: number): { top: number; ticks: number[] } {
-  if (max <= 0) return { top: 1, ticks: [0, 1] };
-  const rough = max / 4;
-  const exp = Math.pow(10, Math.floor(Math.log10(rough)));
-  const frac = rough / exp;
-  const step = (frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 2.5 ? 2.5 : frac <= 5 ? 5 : 10) * exp;
-  const top = Math.ceil(max / step) * step;
-  const ticks: number[] = [];
-  for (let index = 0; index * step <= top + step * 0.001; index += 1) {
-    ticks.push(Math.round(index * step * 1000) / 1000);
-  }
-  return { top, ticks };
+/** 直近6か月。システム開始から6か月たつまでは、開始月からの月を並べる。 */
+function rangeLabel(series: Point[]): string {
+  if (series.length >= 6) return "直近6か月";
+  if (series.length <= 1) return series[0]?.label ?? "";
+  return `${series[0].label}〜${series[series.length - 1].label}`;
 }
 
 function plotBox(values: number[]) {
@@ -54,6 +39,31 @@ function plotBox(values: number[]) {
   const xOf = (index: number) => padLeft + ((index + 0.5) * plotW) / Math.max(1, values.length);
   const baseline = padTop + plotH;
   return { width, height, padLeft, padRight, padTop, baseline, ticks, yOf, xOf, plotW };
+}
+
+function exactValue(value: number, money: boolean): string {
+  return money ? formatYen(value) : Math.round(value).toLocaleString("ja-JP");
+}
+
+type Tip = { x: number; y: number; label: string; value: string };
+
+function ChartTip({ tip, width, height }: { tip: Tip | null; width: number; height: number }) {
+  if (!tip) return null;
+  const above = tip.y > 40;
+  return (
+    <div
+      role="tooltip"
+      className="pointer-events-none absolute z-20 whitespace-nowrap rounded-md border border-surface-line bg-white px-2 py-1 text-ink shadow-md"
+      style={{
+        left: `${(tip.x / width) * 100}%`,
+        top: `${(tip.y / height) * 100}%`,
+        transform: above ? "translate(-50%, calc(-100% - 8px))" : "translate(-50%, 8px)",
+      }}
+    >
+      <p className="text-[10px] leading-none text-black/55">{tip.label}</p>
+      <p className="mt-0.5 text-xs font-bold tabular-nums leading-none">{tip.value}</p>
+    </div>
+  );
 }
 
 function Axes({
@@ -89,15 +99,30 @@ function Axes({
 function LineChart({ points, pick, money }: { points: Point[]; pick: (point: Point) => number; money: boolean }) {
   const values = points.map(pick);
   const box = plotBox(values);
-  const coords = values.map((value, index) => ({ x: box.xOf(index), y: box.yOf(value) }));
+  const coords = values.map((value, index) => ({ x: box.xOf(index), y: box.yOf(value), value }));
+  const [tip, setTip] = useState<Tip | null>(null);
   return (
-    <svg viewBox={`0 0 ${box.width} ${box.height}`} className="w-full h-auto" role="img">
-      <Axes box={box} labels={points.map((point) => point.label)} money={money} />
-      <polyline fill="none" stroke="#2d6a4f" strokeWidth="1.25" strokeLinejoin="round" strokeLinecap="round" points={coords.map((c) => `${c.x},${c.y}`).join(" ")} />
-      {coords.map((c, index) => (
-        <circle key={points[index].ym} cx={c.x} cy={c.y} r="2.2" fill="#2d6a4f" />
-      ))}
-    </svg>
+    <div className="relative">
+      <svg viewBox={`0 0 ${box.width} ${box.height}`} className="w-full h-auto" role="img">
+        <Axes box={box} labels={points.map((point) => point.label)} money={money} />
+        <polyline fill="none" stroke="#2d6a4f" strokeWidth="1.25" strokeLinejoin="round" strokeLinecap="round" points={coords.map((c) => `${c.x},${c.y}`).join(" ")} />
+        {coords.map((c, index) => (
+          <g key={points[index].ym}>
+            <circle cx={c.x} cy={c.y} r="2.6" fill="#2d6a4f" />
+            <circle
+              cx={c.x}
+              cy={c.y}
+              r="11"
+              fill="transparent"
+              className="cursor-pointer"
+              onMouseEnter={() => setTip({ x: c.x, y: c.y, label: points[index].label, value: exactValue(c.value, money) })}
+              onMouseLeave={() => setTip(null)}
+            />
+          </g>
+        ))}
+      </svg>
+      <ChartTip tip={tip} width={box.width} height={box.height} />
+    </div>
   );
 }
 
@@ -105,24 +130,25 @@ function BarChart({ points, pick, money }: { points: Point[]; pick: (point: Poin
   const values = points.map(pick);
   const box = plotBox(values);
   const barWidth = 10;
+  const [tip, setTip] = useState<Tip | null>(null);
   return (
-    <svg viewBox={`0 0 ${box.width} ${box.height}`} className="w-full h-auto" role="img">
-      <Axes box={box} labels={points.map((point) => point.label)} money={money} />
-      {values.map((value, index) => {
-        const y = box.yOf(value);
-        const height = Math.max(0, box.baseline - y);
-        return (
-          <rect
-            key={points[index].ym}
-            x={box.xOf(index) - barWidth / 2}
-            y={y}
-            width={barWidth}
-            height={height}
-            fill="#2d6a4f"
-          />
-        );
-      })}
-    </svg>
+    <div className="relative">
+      <svg viewBox={`0 0 ${box.width} ${box.height}`} className="w-full h-auto" role="img">
+        <Axes box={box} labels={points.map((point) => point.label)} money={money} />
+        {values.map((value, index) => {
+          const y = box.yOf(value);
+          const height = Math.max(0, box.baseline - y);
+          const show = () => setTip({ x: box.xOf(index), y: value === 0 ? box.baseline : y, label: points[index].label, value: exactValue(value, money) });
+          return (
+            <g key={points[index].ym}>
+              <rect x={box.xOf(index) - barWidth / 2} y={y} width={barWidth} height={height} fill="#2d6a4f" />
+              <circle cx={box.xOf(index)} cy={value === 0 ? box.baseline : y} r="11" fill="transparent" className="cursor-pointer" onMouseEnter={show} onMouseLeave={() => setTip(null)} />
+            </g>
+          );
+        })}
+      </svg>
+      <ChartTip tip={tip} width={box.width} height={box.height} />
+    </div>
   );
 }
 
@@ -149,13 +175,32 @@ function PieChart({ points, pick, money }: { points: Point[]; pick: (point: Poin
     angle += sweep;
     return { start, end: angle, value, label: points[index].label, color: PIE_COLORS[index % PIE_COLORS.length] };
   });
+  const [tip, setTip] = useState<Tip | null>(null);
   return (
     <div className="flex flex-col items-start gap-3">
-      <svg viewBox="0 0 160 160" className="h-32 w-32 shrink-0" role="img">
-        {total === 0 ? <circle cx="80" cy="80" r="62" fill="#eef0f3" /> : slices.filter((slice) => slice.end > slice.start).map((slice) => (
-          <path key={slice.label} d={piePath(80, 80, 62, slice.start, slice.end)} fill={slice.color} />
-        ))}
-      </svg>
+      <div className="relative h-32 w-32 shrink-0">
+        <svg viewBox="0 0 160 160" className="h-full w-full" role="img">
+          {total === 0 ? <circle cx="80" cy="80" r="62" fill="#eef0f3" /> : slices.filter((slice) => slice.end > slice.start).map((slice) => {
+            const mid = (slice.start + slice.end) / 2;
+            return (
+              <path
+                key={slice.label}
+                d={piePath(80, 80, 62, slice.start, slice.end)}
+                fill={slice.color}
+                className="cursor-pointer"
+                onMouseEnter={() => setTip({
+                  x: 80 + 40 * Math.cos(mid),
+                  y: 80 + 40 * Math.sin(mid),
+                  label: slice.label,
+                  value: exactValue(slice.value, money),
+                })}
+                onMouseLeave={() => setTip(null)}
+              />
+            );
+          })}
+        </svg>
+        <ChartTip tip={tip} width={160} height={160} />
+      </div>
       <ul className="min-w-0 space-y-1 text-sm">
         {slices.map((slice) => (
           <li key={slice.label} className="flex items-center gap-2">
@@ -177,6 +222,7 @@ const TABS: { id: Kind; label: string }[] = [
 
 export default function ReportCharts({ series }: { series: MonthReport["series"] }) {
   const [kind, setKind] = useState<Kind>("line");
+  const range = rangeLabel(series);
   return (
     <section className="space-y-4">
       <div className="no-print flex justify-end">
@@ -196,9 +242,9 @@ export default function ReportCharts({ series }: { series: MonthReport["series"]
         </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3" role="tabpanel">
-        {SERIES.map((item) => (
-          <article key={item.title} className="card">
-            <h2 className="section-title">{item.title}</h2>
+        {SERIES.map((item, index) => (
+          <article key={item.title} className="card !overflow-visible">
+            <h2 className="section-title">{index === 0 && range ? `${item.title}（${range}）` : item.title}</h2>
             {kind === "line" ? <LineChart points={series} pick={item.pick} money={item.money} /> : null}
             {kind === "bar" ? <BarChart points={series} pick={item.pick} money={item.money} /> : null}
             {kind === "pie" ? <PieChart points={series} pick={item.pick} money={item.money} /> : null}

@@ -5,11 +5,13 @@ import { formatUnits } from "@/lib/format";
 import {
   buildMonthReport,
   currentYearMonth,
+  isSoldHorse,
   formatYearMonth,
   monthLabel,
   monthStart,
   parseYearMonth,
   shiftMonth,
+  stripeReceipts,
   supportsActiveAt,
   type MonthReport,
   type ReportSource,
@@ -17,7 +19,7 @@ import {
 } from "@/lib/monthlyReport";
 
 export type IncomeSlice = {
-  key: "dues" | "share" | "card" | "bank";
+  key: "dues" | "share" | "card" | "bank" | "other";
   label: string;
   current: number;
   previous: number;
@@ -110,11 +112,13 @@ function buildBright(source: ReportSource, ym: string, start: number, end: numbe
   }
   gained.sort((a, b) => b.deltaUnits - a.deltaUnits || a.name.localeCompare(b.name, "ja"));
 
+  // Stripe の支払いを 1 件ずつ、決済額のまま数える（Stripe の画面の売上・件数と同じ）。
+  // 同じ支払いが Webhook と Stripe 同期の2行で入るので、行をそのまま足すと二重になる。
   let receivedYen = 0;
   let receivedCount = 0;
-  for (const payment of source.payments) {
-    if (payment.status !== "succeeded" || !inMonth(payment.occurred_at, start, asOf)) continue;
-    receivedYen += Number(payment.amount) || 0;
+  for (const receipt of stripeReceipts(source)) {
+    if (receipt.at < start || receipt.at >= asOf) continue;
+    receivedYen += receipt.amount;
     receivedCount += 1;
   }
   const newSupports = source.supports.filter(
@@ -153,6 +157,11 @@ function slicesOf(current: MonthReport, previous: MonthReport): IncomeSlice[] {
     { key: "card", label: "単発寄付（カード）", current: current.donations.card, previous: previous.donations.card },
     { key: "bank", label: "単発寄付（銀行振込・着金）", current: current.donations.bank, previous: previous.donations.bank },
   ];
+  // 会費にも一口支援にも振り分けられなかった定期入金。あるときだけ出して、内訳の合計を収入に合わせる。
+  if (current.otherIncomeYen !== 0 || previous.otherIncomeYen !== 0) {
+    // マイナスは、以前の月の決済をこの月に返金した分（元の決済の区分が分からないもの）。
+    rows.push({ key: "other", label: "その他（区分できない入金・返金）", current: current.otherIncomeYen, previous: previous.otherIncomeYen });
+  }
   return rows.map((row) => ({ ...row, delta: row.current - row.previous }));
 }
 
@@ -226,13 +235,18 @@ export function buildGivingInsight(source: ReportSource, ym: string, now = new D
     return [];
   });
 
+  // 支援を募っている馬だけを見る。オーナーが決まった馬（売却・譲渡）や、支援を受け付けていない枠は「口数なし」が普通。
   const shortHorses = source.horses
-    .filter((horse) => !isDeceased(horse.name))
+    .filter((horse) => !isDeceased(horse.name) && !isSoldHorse(horse.name) && horse.is_supportable !== false)
     .map((horse) => ({ id: horse.id, name: horse.name, units: nowMap.get(horse.id)?.units ?? 0 }))
     .filter((horse) => horse.units <= 0);
 
+  // Stripe の失敗した決済の件数。Webhook が同じ失敗について入れた控えの行（請求IDあり・決済IDなし）は数えない。
   const failedPayments = source.payments.filter(
-    (payment) => payment.status === "failed" && inMonth(payment.occurred_at, start, end),
+    (payment) =>
+      payment.status === "failed" &&
+      !(payment.invoice_id && !payment.charge_id) &&
+      inMonth(payment.occurred_at, start, end),
   ).length;
   const stoppedSupports = source.supports.filter((support) => inMonth(support.canceled_at, start, end)).length;
   const bright = buildBright(source, ym, start, end, now);

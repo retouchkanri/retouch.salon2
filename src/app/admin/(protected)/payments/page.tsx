@@ -29,6 +29,13 @@ function resolveCustomerEmail(p: any): string {
 
 const PAGE_SIZE = 20;
 
+type PaymentSource = "stripe" | "manual" | "all";
+const SOURCE_TABS: { key: PaymentSource; label: string }[] = [
+  { key: "stripe", label: "Stripe の決済" },
+  { key: "manual", label: "銀行振込など" },
+  { key: "all", label: "すべて" },
+];
+
 // Stripe-style status summary chips.
 const STATUS_CHIPS: { key: string; label: string }[] = [
   { key: "", label: "すべて" },
@@ -56,7 +63,7 @@ function resolveDescription(raw: any, kind: string): string {
     /^Thank you/.test(desc) ||
     /^Subscription (update|creation)/.test(desc);
   if (isGeneric) {
-    return kind === "subscription" ? "定期支援" : kind === "one_time" ? "単発寄付" : "—";
+    return kind === "subscription" ? "定期支援" : kind === "one_time" || kind === "donation" ? "単発寄付" : "—";
   }
   return desc;
 }
@@ -64,7 +71,7 @@ function resolveDescription(raw: any, kind: string): string {
 export default async function AdminPaymentsPage({
   searchParams,
 }: {
-  searchParams?: { status?: string; q?: string; page?: string };
+  searchParams?: { status?: string; q?: string; page?: string; source?: string };
 }) {
   await requireCapability("payments.manage");
   // Keep current with Stripe on each load (incremental, best-effort).
@@ -75,6 +82,8 @@ export default async function AdminPaymentsPage({
   const supabase = createSupabaseAdminClient();
 
   const status = searchParams?.status ?? "";
+  // 既定は Stripe の決済だけ。Stripe の「取引」の一覧と 1 対 1 になる（決済 1 件につき 1 行）。
+  const source: PaymentSource = searchParams?.source === "manual" || searchParams?.source === "all" ? searchParams.source : "stripe";
   const q = (searchParams?.q ?? "").trim();
   const page = Math.max(1, Number(searchParams?.page ?? "1") || 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -100,6 +109,10 @@ export default async function AdminPaymentsPage({
   }
 
   const applyFilters = (qy: any, statusVal: string) => {
+    // Webhook が同じ決済について入れた控えの行（決済IDなし）は、どの表示でも出さない。出すと同じ決済が2行になる。
+    if (source === "stripe") qy = qy.not("stripe_charge_id", "is", null);
+    else if (source === "manual") qy = qy.is("stripe_charge_id", null).is("stripe_event_id", null);
+    else qy = qy.or("stripe_charge_id.not.is.null,stripe_event_id.is.null");
     if (statusVal) qy = qy.eq("status", statusVal);
     if (orFilter) qy = qy.or(orFilter);
     return qy;
@@ -136,10 +149,12 @@ export default async function AdminPaymentsPage({
   const totalCount = counts[status] ?? counts[""] ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  const linkFor = (opts: { status?: string; page?: number }) => {
+  const linkFor = (opts: { status?: string; page?: number; source?: PaymentSource }) => {
     const sp = new URLSearchParams();
     const s = opts.status ?? status;
     if (s) sp.set("status", s);
+    const src = opts.source ?? source;
+    if (src !== "stripe") sp.set("source", src);
     if (q) sp.set("q", q);
     if (opts.page && opts.page > 1) sp.set("page", String(opts.page));
     const str = sp.toString();
@@ -151,6 +166,25 @@ export default async function AdminPaymentsPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">決済履歴</h1>
         <SyncButton />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1">
+        {SOURCE_TABS.map((tab) => (
+          <Link
+            key={tab.key}
+            href={linkFor({ source: tab.key, page: 1 })}
+            className={`rounded-full px-3 py-1 text-xs ${source === tab.key ? "bg-brand text-white" : "bg-white text-ink-soft"}`}
+          >
+            {tab.label}
+          </Link>
+        ))}
+        <p className="ml-2 text-xs text-ink-mute">
+          {source === "stripe"
+            ? "Stripe の「取引」と同じ一覧です。決済 1 件につき 1 行で、件数も Stripe と一致します。"
+            : source === "manual"
+              ? "Stripe を通らない入金（銀行振込の寄付を入金済みにしたもの）です。"
+              : "Stripe の決済と、Stripe を通らない入金の両方です。"}
+        </p>
       </div>
 
       {/* Stripe-style status summary chips */}
@@ -178,6 +212,7 @@ export default async function AdminPaymentsPage({
           <input name="q" className="input" defaultValue={q} placeholder="検索..." />
         </div>
         {status && <input type="hidden" name="status" value={status} />}
+        {source !== "stripe" && <input type="hidden" name="source" value={source} />}
         <button className="btn-primary">絞り込む</button>
         {(q || status) && (
           <Link className="btn-ghost" href="/admin/payments">

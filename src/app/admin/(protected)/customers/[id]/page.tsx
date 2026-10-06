@@ -10,6 +10,7 @@ import SpecialMembershipsManager from "./SpecialMembershipsManager";
 import BasicPlanManager from "./BasicPlanManager";
 import VisitHistory from "./VisitHistory";
 import PaymentHistory from "./PaymentHistory";
+import { canonicalPayments } from "@/lib/paymentRows";
 import SupportsManager from "./SupportsManager";
 import { getSession } from "@/lib/auth";
 import { can } from "@/lib/roles";
@@ -48,7 +49,8 @@ export default async function CustomerDetail({ params }: { params: { id: string 
       .select("*")
       .eq("customer_id", params.id)
       .order("requested_at", { ascending: false }),
-    supabase.from("payments").select("*").eq("customer_id", params.id).order("occurred_at", { ascending: false }).limit(50),
+    // 同じ決済が Webhook と Stripe 同期の2行で入るので、多めに読んでから 1 件 1 行にそろえる（下の canonicalPayments）。
+    supabase.from("payments").select("*").eq("customer_id", params.id).order("occurred_at", { ascending: false }).limit(100),
     supabase.from("admin_memos").select("*").eq("customer_id", params.id).order("slot"),
     supabase.from("special_team_memberships").select("*, horse:horses(*)").eq("customer_id", params.id).order("started_at", { ascending: false }),
     supabase.from("horses").select("id, name").order("sort_order", { ascending: true }),
@@ -446,7 +448,7 @@ export default async function CustomerDetail({ params }: { params: { id: string 
         <h2 className="section-title">決済履歴</h2>
         <PaymentHistory
           canDelete={canDeletePayments}
-          payments={((payments as any[]) ?? []).map((p) => ({
+          payments={canonicalPayments((payments as any[]) ?? []).slice(0, 50).map((p) => ({
             id: p.id,
             occurred_at: p.occurred_at ?? null,
             kind: p.kind,
