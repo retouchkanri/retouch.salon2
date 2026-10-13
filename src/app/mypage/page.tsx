@@ -15,7 +15,7 @@ import {
 } from "@/lib/customer";
 import SpecialTeamStopButton from "./SpecialTeamStopButton";
 import CommunityMypageCard from "@/components/community/CommunityMypageCard";
-import { canSeeCommunity } from "@/lib/community/visibility";
+import { communityVisibleFor } from "@/lib/community/access";
 import { MEMBER_SELF_SERVICE_ENABLED, MEMBER_PLAN_SELF_SERVICE_ENABLED } from "@/lib/featureFlags";
 import { formatDate, formatUnits, formatYen, memberClassLabel } from "@/lib/format";
 import { isBasicMemberPlanCode } from "@/lib/constraints";
@@ -302,7 +302,8 @@ export default async function MyPageTop() {
               </div>
             </div>
           </Link>
-          {canSeeCommunity(session.role) && <CommunityMypageCard />}
+          {/* コミュニティを利用できるのは有料会員（会員種別のある会員）だけ */}
+          {(await communityVisibleFor(session.role)) && <CommunityMypageCard />}
         </div>
       </section>
 

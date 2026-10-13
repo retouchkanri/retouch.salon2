@@ -4,7 +4,7 @@ import { requireCapability } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { writeAudit } from "@/lib/audit";
 import { getBaseUrl } from "@/lib/site";
-import { sendMemberMessage, AUDIENCE_VALUES, isFileUrlOrUploadPath } from "@/lib/memberMessages";
+import { sendMemberMessage, AUDIENCE_VALUES, freeGroupAudienceError, isFileUrlOrUploadPath, legacyAudience } from "@/lib/memberMessages";
 
 // 添付は絶対 URL または VPS に保存したファイルのパス（/uploads/...）。
 const fileUrl = z.string().refine(isFileUrlOrUploadPath, "添付ファイルのURLが正しくありません");
@@ -60,6 +60,8 @@ export async function POST(req: Request) {
     );
   }
   const d = parsed.data;
+  const audienceError = freeGroupAudienceError(d.audiences);
+  if (audienceError) return NextResponse.json({ error: audienceError }, { status: 400 });
 
   let scheduledAtIso: string | null = null;
   if (d.action === "schedule" && d.scheduled_at) {
@@ -84,7 +86,7 @@ export async function POST(req: Request) {
       channel_inapp: d.channel_inapp,
       channel_email: d.channel_email,
       // audience（単一値）は後方互換のため先頭の選択値を保持。実際の配信対象解決は audiences を使う。
-      audience: d.audiences[0],
+      audience: legacyAudience(d.audiences),
       audiences: d.audiences,
       target_customer_ids: d.audiences.includes("subset") ? d.target_customer_ids : [],
       image_urls: d.image_urls,

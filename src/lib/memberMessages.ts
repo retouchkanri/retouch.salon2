@@ -1,6 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isValidEmailAddress, notify, numEnv } from "./notify";
-import { fetchAllRows } from "@/lib/fetchAll";
+import { fetchAllByIds, fetchAllRows } from "@/lib/fetchAll";
+import {
+  FREE_GROUP_AUDIENCES,
+  classifyFreeMembers,
+  countFreeGroups,
+  isFreeGroupAudience,
+  type DonationMark,
+  type FreeGroupCounts,
+  type FreeMemberGroup,
+  type FreeMemberRow,
+  type PaymentMark,
+} from "@/lib/freeMemberGroups";
 import type { MemberMessage } from "@/types/db";
 
 /**
@@ -64,6 +75,9 @@ export const AUDIENCE_VALUES = [
   "rpt_only",
   "support_only",
   "no_class",
+  // 無料会員（no_class）の内訳。定義は src/lib/freeMemberGroups.ts。
+  "no_class_donor",
+  "no_class_idle",
   "class_attender",
   "class_owner",
   "class_b",
@@ -72,6 +86,28 @@ export const AUDIENCE_VALUES = [
   "class_support",
   "team_only",
 ] as const;
+
+/**
+ * member_messages.audience（旧・単一値の列）に入れる値。この列には DB の CHECK 制約があり、
+ * 制約を作った時点の値しか入らない。無料会員①②は制約にないので、親の区分 no_class を入れる。
+ * 配信対象の解決に使うのは audiences（配列）だけなので、配信先は変わらない。
+ */
+export function legacyAudience(audiences: readonly string[]): string {
+  const first = audiences[0];
+  return isFreeGroupAudience(first) ? "no_class" : first;
+}
+
+/**
+ * 無料会員①②を、このサーバーで保存してよいか。保存できないときは理由を返す。
+ * 開発サーバーは本番と同じデータベースを使い、予約・配信中のメッセージは本番の cron が送る。
+ * ①②を知らない古い版の本番がそのメッセージを処理すると、知らない配信対象を「全会員」として扱い、
+ * 全員に送ってしまう。そのため①②を保存できるのは、①②を解決できる本番ビルドだけにする。
+ */
+export function freeGroupAudienceError(audiences: readonly string[]): string | null {
+  if (!audiences.some(isFreeGroupAudience)) return null;
+  if (process.env.NODE_ENV === "production") return null;
+  return "「無料会員①」「無料会員②」は、本番サイトでのみ保存・配信できます。開発用のサイトでは、対象の人数の確認だけができます。";
+}
 
 // ---------------------------------------------------------------------------
 // HTML / text rendering
@@ -320,6 +356,52 @@ const VIEW_AUDIENCE_FILTERS: Record<string, (q: any) => any> = {
   team_only: (q) => q.gt("special_team_count", 0),
 };
 
+/**
+ * いま有効な無料会員（no_class）を、寄付・支払いの記録と登録日で区分する。
+ * 読み込みに失敗したら必ず例外にする。寄付の記録が読めないまま進めると、寄付のある方が②に入ってしまう。
+ */
+export async function loadFreeMemberGroups(admin: SupabaseClient, now: Date = new Date()): Promise<Map<string, FreeMemberGroup>> {
+  const free = await fetchAllRows<{ customer_id: string }>((from, to) =>
+    VIEW_AUDIENCE_FILTERS.no_class(admin.from("v_customer_summary").select("customer_id").eq("status", "active"))
+      .order("customer_id", { ascending: true })
+      .range(from, to),
+  );
+  if (free.error) throw new Error(`無料会員の取得に失敗しました: ${free.error.message}`);
+  const ids = free.rows.map((row) => row.customer_id);
+
+  const [members, donations, payments] = await Promise.all([
+    fetchAllByIds<FreeMemberRow>(ids, (chunk, from, to) =>
+      admin.from("customers").select("id, email, joined_at, created_at").in("id", chunk).order("id", { ascending: true }).range(from, to),
+    ),
+    // 会員に紐づいていない寄付もメールアドレスで照合するので、寄付は全件を読む。
+    fetchAllRows<DonationMark>((from, to) =>
+      admin
+        .from("donations")
+        .select("customer_id, donor_email, status, payment_method")
+        .in("status", ["succeeded", "pending"])
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllByIds<PaymentMark>(ids, (chunk, from, to) =>
+      admin
+        .from("payments")
+        .select("customer_id, kind, status")
+        .in("customer_id", chunk)
+        .eq("status", "succeeded")
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+  ]);
+  const error = members.error ?? donations.error ?? payments.error;
+  if (error) throw new Error(`無料会員の寄付・支払いの記録の取得に失敗しました: ${error.message}`);
+  return classifyFreeMembers(members.rows, donations.rows, payments.rows, now);
+}
+
+/** 配信フォームに出す、無料会員の内訳の人数。 */
+export async function countFreeMemberGroups(admin: SupabaseClient): Promise<FreeGroupCounts> {
+  return countFreeGroups(await loadFreeMemberGroups(admin));
+}
+
 async function resolveSingleAudience(
   admin: SupabaseClient,
   audience: string,
@@ -330,6 +412,12 @@ async function resolveSingleAudience(
     if (ids.length === 0) return [];
     // ids が 1000 を超えても取りこぼさないよう、チャンク取得に統一する。
     return fetchCustomersByIds(admin, ids);
+  }
+
+  if (isFreeGroupAudience(audience)) {
+    const groups = await loadFreeMemberGroups(admin);
+    const wanted = FREE_GROUP_AUDIENCES[audience];
+    return fetchCustomersByIds(admin, [...groups].filter(([, group]) => group === wanted).map(([id]) => id));
   }
 
   const viewFilter = VIEW_AUDIENCE_FILTERS[audience];
@@ -346,7 +434,10 @@ async function resolveSingleAudience(
     return fetchCustomersByIds(admin, ids);
   }
 
-  // 'all'（または未知の値のフォールバック）→ 全アクティブ会員。
+  // 知らない値を「全会員」として扱うと、意図しない全員配信になる。解決できない対象には送らない。
+  if (audience !== "all") throw new Error(`配信対象「${audience}」を解決できません。配信対象を選び直してください。`);
+
+  // 'all' → 全アクティブ会員。
   // 必ず id 順でページングする。order 無しの .range() は PostgREST の結果順が
   // 不定のため、ページ境界で会員が抜け落ちる（「リストにいない」事故の原因）。
   const { rows, error } = await fetchAllRows<AudienceCustomer>((from, to) =>

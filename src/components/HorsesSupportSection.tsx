@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSession } from "@/lib/auth";
-import { compareHorsesForDisplay, isEmergencyRecruitmentHorse } from "@/lib/horses";
+import { compareHorsesForDisplay, isRecruitmentSlot } from "@/lib/horses";
 import { fetchAllRows } from "@/lib/fetchAll";
 import HorsesSupportGrid, { type HorseCardData } from "@/components/HorsesSupportGrid";
 
@@ -11,7 +11,6 @@ type HorseRow = {
   profile: string | null;
   image_url: string | null;
   is_supportable: boolean;
-  is_emergency_recruitment?: boolean;
   sort_order: number;
 };
 type SupportInfo = {
@@ -49,11 +48,7 @@ export default async function HorsesSupportSection({
   const [{ data: horses }, { rows: supporters }] = await Promise.all([
     admin
       .from("horses")
-      // is_emergency_recruitment は必ず取得すること。取得しないと
-      // isEmergencyRecruitmentHorse() が undefined を見て常に false となり、
-      // 管理画面で「緊急募集」にしてもトップ／馬一覧でピンク表示・上段固定に
-      // ならない（馬名に「緊急支援募集馬」を含む場合だけ偶然動いていた）。
-      .select("id, name, profile, image_url, is_supportable, is_emergency_recruitment, sort_order")
+      .select("id, name, profile, image_url, is_supportable, sort_order")
       .order("sort_order"),
     fetchAllRows<any>((from, to) =>
       admin
@@ -78,9 +73,10 @@ export default async function HorsesSupportSection({
     byHorse.set(s.horse_id, cur);
   }
 
-  const sorted = [...(horses as HorseRow[])].sort((a, b) =>
-    compareHorsesForDisplay(a, b, (id) => byHorse.get(id)?.totalUnits ?? 0),
-  );
+  // 新規募集の枠の行は出さない。どの馬も同じ見た目・同じ並び方にする。
+  const sorted = (horses as HorseRow[])
+    .filter((horse) => !isRecruitmentSlot(horse))
+    .sort((a, b) => compareHorsesForDisplay(a, b, (id) => byHorse.get(id)?.totalUnits ?? 0));
 
   const displayed = limit != null ? sorted.slice(0, limit) : sorted;
   const hasMore = limit != null && sorted.length > limit;
@@ -93,7 +89,6 @@ export default async function HorsesSupportSection({
       profile: horse.profile,
       imageUrl: horse.image_url,
       isSupportable: horse.is_supportable,
-      emergency: isEmergencyRecruitmentHorse(horse),
       totalUnits: info?.totalUnits ?? 0,
       supporters: info?.supporters ?? 0,
       nicknames: info?.nicknames ?? [],

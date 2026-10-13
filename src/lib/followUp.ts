@@ -5,6 +5,11 @@
 export const LOGIN_STALE_DAYS = 90;
 export const FAILED_WINDOW_DAYS = 45;
 export const STOP_WINDOW_DAYS = 60;
+/**
+ * 「済」「削除」の印をつけてから、この日数のあいだの決済失敗は、同じ件として扱う。
+ * カード会社への再請求が数日おきに続くため（2026-10 実測：同じ人の失敗の間隔は、ほとんどが 7日以内）。
+ */
+export const MARK_RETRY_DAYS = 30;
 
 export const FOLLOW_REASONS = [
   { key: "payment_failed", label: "決済失敗" },
@@ -54,7 +59,37 @@ export type FollowUp = {
   monthlyYen: number;
   annualYen: number;
   detail: string;
+  /** 直近の決済失敗の日時（集計の期間内）。無いときは null。 */
+  latestFailedAt: string | null;
+  /** 直近の支援・契約の停止の日時（集計の期間内）。無いときは null。 */
+  latestStopAt: string | null;
 };
+
+/** 管理者がつける印。済 = 連絡などの対応が済んだ。削除 = 一覧から外す。 */
+export const FOLLOW_MARK_STATES = [
+  { key: "done", label: "済" },
+  { key: "dismissed", label: "削除" },
+] as const;
+export type FollowMarkState = (typeof FOLLOW_MARK_STATES)[number]["key"];
+
+export type FollowMark = {
+  customerId: string;
+  state: FollowMarkState;
+  /** 印をつけた日時。 */
+  at: string;
+  /** 印をつけたときに出ていた理由。 */
+  reasons: FollowReason[];
+};
+
+/** 印の記録（つけた・外したの履歴）。いちばん新しい 1件が、その人のいまの印。 */
+export type FollowMarkEvent = {
+  customerId: string | null;
+  state: string;
+  at: string;
+  reasons?: unknown;
+};
+
+export type FollowStatus = "open" | FollowMarkState;
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -182,6 +217,18 @@ export function buildFollowUps(
     }
 
     if (reasons.size === 0) continue;
+    const latest = (values: (string | null)[]) => {
+      let best: string | null = null;
+      for (const value of values) {
+        const at = time(value);
+        if (at != null && (best == null || at > time(best)!)) best = value;
+      }
+      return best;
+    };
+    const inStopWindow = (iso: string | null) => {
+      const canceled = time(iso);
+      return canceled != null && canceled >= stopSince && canceled <= nowMs;
+    };
     const canceledYen = recentlyCanceledAmount(ownSupports, nowMs, stopSince);
     const monthlyYen = currentYen > 0 ? currentYen : canceledYen;
     const order = FOLLOW_REASONS.map((reason) => reason.key);
@@ -193,10 +240,70 @@ export function buildFollowUps(
       monthlyYen,
       annualYen: monthlyYen * 12,
       detail: notes.join(""),
+      latestFailedAt: latest(ownFailed.map((payment) => payment.occurredAt)),
+      latestStopAt: latest([
+        ...ownContracts.filter((contract) => contract.status === "canceled" && inStopWindow(contract.canceledAt)).map((contract) => contract.canceledAt),
+        ...ownSupports.filter((support) => inStopWindow(support.canceledAt)).map((support) => support.canceledAt),
+      ]),
     });
   }
   rows.sort((a, b) => b.monthlyYen - a.monthlyYen || a.name.localeCompare(b.name, "ja"));
   return rows;
+}
+
+const MARK_KEYS = new Set<string>(FOLLOW_MARK_STATES.map((state) => state.key));
+
+/** 保存する前や読み込んだあとに、理由のキーだけを残す。 */
+export function cleanFollowReasons(value: unknown): FollowReason[] {
+  if (!Array.isArray(value)) return [];
+  return FOLLOW_REASONS.map((reason) => reason.key).filter((key) => value.includes(key));
+}
+
+/** 印の履歴から、顧客ごとのいまの印を出す。最後が「未対応に戻す」の人は、印なし。 */
+export function latestFollowMarks(events: FollowMarkEvent[]): Map<string, FollowMark> {
+  const sorted = [...events].sort((a, b) => (time(a.at) ?? 0) - (time(b.at) ?? 0));
+  const marks = new Map<string, FollowMark>();
+  for (const event of sorted) {
+    if (!event.customerId || time(event.at) == null) continue;
+    if (MARK_KEYS.has(event.state)) {
+      marks.set(event.customerId, {
+        customerId: event.customerId,
+        state: event.state as FollowMarkState,
+        at: event.at,
+        reasons: cleanFollowReasons(event.reasons),
+      });
+    } else if (event.state === "open") {
+      marks.delete(event.customerId);
+    }
+  }
+  return marks;
+}
+
+/**
+ * いまの状態。印は、つけたときの件についてのもの。次のどれかがあれば、印があっても「未対応」に戻す：
+ *   - 印をつけたときには無かった理由が加わった
+ *   - 印をつけたあとに、支援や契約の停止があった
+ *   - 印をつけてから MARK_RETRY_DAYS 日を過ぎたあとに、決済失敗があった（それまでの失敗は、同じ請求の再請求とみなす）
+ * renewed は、印があったのに未対応に戻したとき true。
+ */
+export function followStatus(row: FollowUp, mark: FollowMark | null | undefined): { status: FollowStatus; renewed: boolean } {
+  if (!mark) return { status: "open", renewed: false };
+  const markedAt = time(mark.at);
+  if (markedAt == null) return { status: "open", renewed: false };
+  const newReason = row.reasons.some((reason) => !mark.reasons.includes(reason));
+  const stoppedAt = time(row.latestStopAt);
+  const failedAt = time(row.latestFailedAt);
+  const stoppedAgain = stoppedAt != null && stoppedAt > markedAt;
+  const failedAgain = failedAt != null && failedAt >= markedAt + MARK_RETRY_DAYS * DAY;
+  if (newReason || stoppedAgain || failedAgain) return { status: "open", renewed: true };
+  return { status: mark.state, renewed: false };
+}
+
+/** 未対応・済・削除ごとに分ける。 */
+export function splitFollowUps(rows: FollowUp[], marks: ReadonlyMap<string, FollowMark>): Record<FollowStatus, FollowUp[]> {
+  const out: Record<FollowStatus, FollowUp[]> = { open: [], done: [], dismissed: [] };
+  for (const row of rows) out[followStatus(row, marks.get(row.customerId)).status].push(row);
+  return out;
 }
 
 export function followUpRiskYen(rows: FollowUp[]): { monthly: number; annual: number } {

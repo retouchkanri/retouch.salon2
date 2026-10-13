@@ -13,7 +13,6 @@ export default function HorseEditForm({ horse }: { horse: Horse }) {
     profile: horse.profile ?? "",
     image_url: horse.image_url ?? "",
     is_supportable: horse.is_supportable,
-    is_emergency_recruitment: horse.is_emergency_recruitment ?? false,
     sort_order: horse.sort_order ?? 100,
   });
   const [busy, setBusy] = useState(false);
@@ -78,15 +77,6 @@ export default function HorseEditForm({ horse }: { horse: Horse }) {
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={form.is_supportable} onChange={set("is_supportable")} className="w-5 h-5" />
           <span>支援受付中</span>
-        </label>
-        <label className="flex items-center gap-2 md:col-span-2">
-          <input
-            type="checkbox"
-            checked={form.is_emergency_recruitment}
-            onChange={set("is_emergency_recruitment")}
-            className="w-5 h-5"
-          />
-          <span>緊急支援募集（トップ・馬一覧でピンク表示・最上段に固定）</span>
         </label>
       </div>
       {msg && <p className="text-sm">{msg}</p>}

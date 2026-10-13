@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { requireCapability } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { formatDate } from "@/lib/format";
+import { FREE_GROUP_LABELS } from "@/lib/freeMemberGroups";
+import { countFreeMemberGroups } from "@/lib/memberMessages";
 import MemberMessageForm from "../MemberMessageForm";
 import MessageActions from "./MessageActions";
 
@@ -24,6 +26,7 @@ const AUDIENCE_LABEL: Record<string, string> = {
   rpt_only: "リタポメンバー",
   support_only: "1口支援者のみ",
   no_class: "空白の人のみ（無料会員）",
+  ...FREE_GROUP_LABELS,
   subset: "指定会員",
   class_attender: "アテンダー会員",
   class_owner: "オーナーズ会員",
@@ -192,7 +195,13 @@ export default async function MemberMessageDetailPage({
       {editable ? (
         <section className="space-y-2">
           <h2 className="font-bold">編集</h2>
-          <MemberMessageForm initial={m} id={m.id} initialTargets={initialTargets} />
+          <MemberMessageForm
+            initial={m}
+            id={m.id}
+            initialTargets={initialTargets}
+            freeGroups={await countFreeMemberGroups(admin).catch(() => null)}
+            freeGroupsUsable={process.env.NODE_ENV === "production"}
+          />
         </section>
       ) : (
         <section className="space-y-2">

@@ -2,6 +2,7 @@
  * 経営管理画面と会員向け月次収支報告の集計（I/O なし）。
  * 月の境界は日本時間。公開後の会員向け表示は、ここではなく保存済みスナップショットを使う。
  */
+import { isRecruitmentSlot } from "@/lib/horses";
 
 export const BOARDING_PER_HORSE_YEN = 99_000;
 export const OPERATING_EXPENSE_RATE = 0.2;
@@ -178,17 +179,30 @@ export type Adjustments = {
   duesExtraYen: number;
   shareFeeYen: number;
   shareExtraYen: number;
+  /** 会員サイトの記録にない収入。その月に受け取った金額を手で入れる。 */
+  youtubeYen: number;
+  transferYen: number;
+  otherYen: number;
   /** 売却・譲渡した頭数。null は自動（名前に「オーナー決定」とある馬の数）。 */
   soldHorses: number | null;
 };
 
 export const ADJUST_ROWS = [
   { key: "donation", label: "単発寄付", fee: "donationFeeYen", extra: "donationExtraYen", extraHint: "システムに申告のない、直接振込の寄付" },
-  { key: "dues", label: "会費収入", fee: "duesFeeYen", extra: "duesExtraYen", extraHint: "銀行振込などで受けた会費" },
-  { key: "share", label: "一口支援", fee: "shareFeeYen", extra: "shareExtraYen", extraHint: "銀行振込・口座引落で受けた一口支援" },
+  { key: "dues", label: "会員寄付（会費）", fee: "duesFeeYen", extra: "duesExtraYen", extraHint: "銀行振込などで受けた会費" },
+  { key: "share", label: "支援寄付（一口）", fee: "shareFeeYen", extra: "shareExtraYen", extraHint: "銀行振込・口座引落で受けた一口支援" },
 ] as const;
 
 export type AdjustRowKey = (typeof ADJUST_ROWS)[number]["key"];
+
+/** 手入力だけの収入の項目。会員サイトでは計算できないので、その月の金額を入れる。 */
+export const EXTRA_INCOME_ROWS = [
+  { key: "youtubeYen", label: "YouTube寄付支援", hint: "YouTube を通じて受け取った寄付・支援" },
+  { key: "transferYen", label: "馬の譲渡収入", hint: "馬の譲渡・売却で受け取った金額" },
+  { key: "otherYen", label: "その他", hint: "上のどの項目にも入らない収入" },
+] as const;
+
+export type ExtraIncomeKey = (typeof EXTRA_INCOME_ROWS)[number]["key"];
 
 export type MonthReport = {
   ym: string;
@@ -206,8 +220,14 @@ export type MonthReport = {
   duesYen: number;
   teamIncomeYen: number;
   shareIncomeYen: number;
-  /** 会費にも一口支援にも振り分けられなかった定期入金。通常は 0。 */
+  /** 会費にも一口支援にも振り分けられなかった定期入金（システム計算）。通常は 0。 */
   otherIncomeYen: number;
+  /**
+   * 手入力の収入の項目。youtubeYen・transferYen は入力した金額そのまま。
+   * otherYen は、システム計算の otherIncomeYen に、手入力の「その他」を足した額（会員に公開する「その他」）。
+   */
+  extraIncome: { youtubeYen: number; transferYen: number; otherYen: number };
+  /** 収入の合計。単発寄付・会員寄付（会費）・支援寄付（一口）に、extraIncome の 3 項目を足した額。 */
   incomeYen: number;
   operatingYen: number;
   careYen: number;
@@ -216,8 +236,12 @@ export type MonthReport = {
   boardingYen: number;
   rescuedHorses: number;
   soldHorses: number;
-  /** 頭数を手入力しないときに使う数。保護馬は故を除く登録数、売却は名前に「オーナー決定」とある数。 */
-  horseDefaults: { rescued: number; sold: number };
+  /**
+   * 頭数を手入力しないときに使う、馬マスタから自動で数えた数。
+   * 保護馬（rescued）は在籍の管理馬＋売却・譲渡した馬、売却（sold）は名前に「オーナー決定」とある馬。
+   * どちらも月の初めより前に登録された馬だけを数える。added は、その月に加わり、翌月から数える管理馬の頭数。
+   */
+  horseDefaults: { rescued: number; sold: number; added: number };
   /** 手入力の調整を入れる前の、会員サイトの記録から計算した収入。 */
   system: SystemIncome;
   /** donations・duesYen・shareIncomeYen・incomeYen に反映済みの、手入力の調整。 */
@@ -225,14 +249,21 @@ export type MonthReport = {
   /** Stripe の残高レポートと同じ数え方の、その月の集計（決済・返金・手数料）。 */
   stripe: StripeMonth;
   /**
-   * 一口支援の月額・支援者数・口数（counts の supportYen / shareSupporters / shareUnits）の出どころ。
-   * billed = その月に Stripe が課金した定期課金、live = いま Stripe で有効な定期課金、registered = サイトの登録。
+   * 一口支援の支援者数・口数・支援合計額（counts の shareSupporters / shareUnits / supportYen）の出どころ。
+   * registered = サイトの登録（当月。支援管理と同じ数字で、支援合計額は 口数 × 1口の金額）、
+   * billed = その月に Stripe が課金した定期課金（終わった月）。live は以前に公開した報告にだけ残る値。
    */
   supportBasis: SupportBasis;
-  /** 支払いが遅れている定期課金の月額（live のときだけ）。 */
+  /** 支払いが遅れている定期課金の月額（当月だけ）。 */
   supportPastDueYen: number;
-  /** サイトに登録されている支援から数えた月末の数字。Stripe と違うときの照合に使う。 */
-  registered: { supportYen: number; shareSupporters: number; shareUnits: number };
+  /** サイトの登録から数えた一口支援。当月は支援管理と同じ数字、終わった月は月末時点の計算。Stripe との照合に使う。 */
+  registered: SupportTotals;
+  /** Stripe が課金している一口支援。Stripe の記録を使っていないときは null。 */
+  stripeSupport: StripeSupport | null;
+  /** 管理馬（支援を募集している在籍馬）の頭数。 */
+  managedHorses: number;
+  /** 管理馬 1頭あたりの支援額（支援合計額 ÷ 管理馬）。銭の位まで。管理馬が 0頭のときは 0。 */
+  supportPerHorseYen: number;
   eventBookings: number;
   horsesUp: HorseChange[];
   horsesDown: HorseChange[];
@@ -261,10 +292,21 @@ export function expenseTotal(expenses: ExpenseMap): number {
 }
 
 export function emptyAdjustments(): Adjustments {
-  return { donationFeeYen: 0, donationExtraYen: 0, duesFeeYen: 0, duesExtraYen: 0, shareFeeYen: 0, shareExtraYen: 0, soldHorses: null };
+  return {
+    donationFeeYen: 0,
+    donationExtraYen: 0,
+    duesFeeYen: 0,
+    duesExtraYen: 0,
+    shareFeeYen: 0,
+    shareExtraYen: 0,
+    youtubeYen: 0,
+    transferYen: 0,
+    otherYen: 0,
+    soldHorses: null,
+  };
 }
 
-/** 保存値・入力値を調整に直す。手数料は 0 以上、足す側は符号つき、頭数は空なら自動（null）。 */
+/** 保存値・入力値を調整に直す。手数料は 0 以上、足す側と手入力の収入は符号つき、頭数は空なら自動（null）。 */
 export function parseAdjustments(raw: unknown): Adjustments {
   const base = emptyAdjustments();
   if (!raw || typeof raw !== "object") return base;
@@ -277,6 +319,7 @@ export function parseAdjustments(raw: unknown): Adjustments {
     base[row.fee] = Math.max(0, yen(src[row.fee]));
     base[row.extra] = yen(src[row.extra]);
   }
+  for (const row of EXTRA_INCOME_ROWS) base[row.key] = yen(src[row.key]);
   const sold = src.soldHorses;
   if (sold != null && sold !== "") {
     const n = Number(sold);
@@ -292,18 +335,24 @@ export function hasIncomeAdjustments(adjust: Adjustments): boolean {
 /**
  * システム計算の収入に手入力の調整を入れて、公開する金額にする。
  * 単発寄付は、手数料をカードの分から引き、直接振込の分を振込に足す。
+ * 手入力だけの収入（YouTube寄付支援・馬の譲渡収入・その他）は、そのまま収入の合計に足す。
+ * 「その他」は、会費にも一口支援にも分けられなかった定期入金・返金（システム計算）に、手入力の分を足した額。
  */
 export function adjustIncome(system: SystemIncome, adjust: Adjustments) {
   const card = system.donationCard - adjust.donationFeeYen;
   const bank = system.donationBank + adjust.donationExtraYen;
   const duesYen = system.duesYen - adjust.duesFeeYen + adjust.duesExtraYen;
   const shareIncomeYen = system.shareIncomeYen - adjust.shareFeeYen + adjust.shareExtraYen;
-  const otherIncomeYen = system.incomeYen - system.donationCard - system.donationBank - system.duesYen - system.shareIncomeYen;
+  const systemOtherYen = system.incomeYen - system.donationCard - system.donationBank - system.duesYen - system.shareIncomeYen;
+  const otherYen = systemOtherYen + adjust.otherYen;
   return {
     donations: { card, bank, total: card + bank },
     duesYen,
     shareIncomeYen,
-    incomeYen: card + bank + duesYen + shareIncomeYen + otherIncomeYen,
+    youtubeYen: adjust.youtubeYen,
+    transferYen: adjust.transferYen,
+    otherYen,
+    incomeYen: card + bank + duesYen + shareIncomeYen + adjust.youtubeYen + adjust.transferYen + otherYen,
   };
 }
 
@@ -756,23 +805,76 @@ export function isSoldHorse(name: string): boolean {
   return /オーナー決定|売却|譲渡/.test(name);
 }
 
-/** 登録されている馬から数えた頭数。売った月は記録にないので、売却はいまの名前で判定する。 */
-function horseDefaultCounts(horses: HorseRow[], endMs: number): { rescued: number; sold: number } {
-  const living = horses.filter((h) => {
+/**
+ * 馬マスタから自動で数えた、その月の預託の頭数。
+ * 保護馬は、在籍している管理馬と、売却・譲渡した馬の合計。売却を引くと、預託の頭数になる。
+ * 亡くなった馬、支援受付を止めていて売却でもない行（新規募集の枠、馬ではない支援チームの行）は数えない。
+ * その月に加わった馬は、翌月から数える：数えるのは、月の初めより前に登録された馬だけ。added は、その月に加わった管理馬の頭数。
+ * 売却や死亡の月は記録にないので、いまの馬マスタの内容で判定する。
+ */
+function horseDefaultCounts(horses: HorseRow[], startMs: number, endMs: number): { rescued: number; sold: number; added: number } {
+  const sold = horses.filter((h) => {
     const created = new Date(h.created_at).getTime();
-    return (!Number.isFinite(created) || created < endMs) && !isDeceasedHorse(h.name);
-  });
-  return { rescued: living.length, sold: living.filter((h) => isSoldHorse(h.name)).length };
+    return (!Number.isFinite(created) || created < startMs) && !isDeceasedHorse(h.name) && isSoldHorse(h.name);
+  }).length;
+  const managedBefore = managedHorseCount(horses, startMs);
+  return { rescued: managedBefore + sold, sold, added: managedHorseCount(horses, endMs) - managedBefore };
+}
+
+/**
+ * 管理馬（支援を募集している在籍馬）の頭数。亡くなった馬、売却・譲渡した馬、支援受付を止めている行、
+ * 馬ではない行（新規募集の枠）は数えない。売却や受付停止の月は記録にないので、いまの登録内容で判定する。
+ */
+export function managedHorseCount(horses: HorseRow[], endMs: number): number {
+  return horses.filter((h) => {
+    const created = new Date(h.created_at).getTime();
+    if (Number.isFinite(created) && created >= endMs) return false;
+    return h.is_supportable !== false && !isDeceasedHorse(h.name) && !isSoldHorse(h.name) && !isRecruitmentSlot(h);
+  }).length;
 }
 
 export type SupportBasis = "billed" | "live" | "registered";
 
-type MonthCounts = { counts: ClassCounts; basis: SupportBasis; registered: ClassCounts };
+/** 一口支援の合計（月額・人数・口数）。 */
+export type SupportTotals = { supportYen: number; shareSupporters: number; shareUnits: number };
+
+type MonthCounts = {
+  counts: ClassCounts;
+  basis: SupportBasis;
+  /** サイトの登録から数えた一口支援。当月は支援管理と同じ数字、終わった月は月末時点の計算。 */
+  site: SupportTotals;
+  /** Stripe が課金している一口支援。Stripe の記録を使っていない月は null。 */
+  stripe: StripeSupport | null;
+};
 
 /**
- * 月末の人数と一口支援を、月ごとに出す関数を作る。一口支援の金額・人数・口数は Stripe から取る：
- * 終わった月はその月に Stripe が課金した定期課金、当月はいま Stripe で有効な定期課金。
- * Stripe の記録を読み込んでいない月だけ、サイトの登録から数える。
+ * Stripe が課金している一口支援の人数・口数・月額。
+ * live = いま Stripe で有効な定期課金（当月）、billed = その月に Stripe が課金した定期課金（終わった月）。
+ */
+export type StripeSupport = { supporters: number; units: number; yen: number; basis: "live" | "billed" };
+
+/**
+ * いまサイトに登録されている一口支援。管理画面の「支援管理」と同じ数え方（状態が「有効」の支援を全部）。
+ * 当月の支援者数・口数は、この数字をそのまま使う。
+ */
+export function activeSupportNow(source: Pick<ReportSource, "supports">): SupportTotals {
+  const supporters = new Set<string>();
+  let shareUnits = 0;
+  let supportYen = 0;
+  for (const support of source.supports) {
+    if (support.status !== "active") continue;
+    supporters.add(support.customer_id);
+    shareUnits += Number(support.units) || 0;
+    supportYen += Number(support.monthly_amount) || 0;
+  }
+  return { supportYen, shareSupporters: supporters.size, shareUnits };
+}
+
+/**
+ * 月末の人数と一口支援を、月ごとに出す関数を作る。
+ * 当月：支援者数・口数は、支援管理と同じくサイトの登録（状態が「有効」の支援）。支援合計額（月額）は、その口数 × 1口の金額。
+ * 終わった月：金額・人数・口数とも、その月に Stripe が課金した定期課金。
+ * Stripe の記録を読み込んでいない月だけ、月末時点のサイトの登録から数える。
  */
 function monthCounter(source: ReportSource, receipts: Receipt[], nowMs: number): (monthYm: string) => MonthCounts {
   const hidden = new Set((source.hiddenEmails ?? []).map((e) => e.trim().toLowerCase()));
@@ -784,15 +886,29 @@ function monthCounter(source: ReportSource, receipts: Receipt[], nowMs: number):
     const monthStartMs = monthStart(point.year, point.month).getTime();
     const monthEndMs = monthStart(pointNext.year, pointNext.month).getTime();
     const registered = countsAt(source, monthEndMs, hidden);
-    const live = source.liveSupport;
-    if (live && live.ym === monthYm && monthEndMs > nowMs) {
-      return { counts: { ...registered, supportYen: live.yen, shareSupporters: live.supporters, shareUnits: live.units }, basis: "live", registered };
+    const monthEndSite: SupportTotals = { supportYen: registered.supportYen, shareSupporters: registered.shareSupporters, shareUnits: registered.shareUnits };
+    if (monthStartMs <= nowMs && nowMs < monthEndMs) {
+      const active = activeSupportNow(source);
+      // 支援合計額は「支援口数 × 1口の金額」。支援管理の口数からそのまま出す。
+      const site: SupportTotals = { ...active, supportYen: active.shareUnits * SUPPORT_UNIT_YEN };
+      const live = source.liveSupport && source.liveSupport.ym === monthYm ? source.liveSupport : null;
+      return {
+        counts: { ...registered, ...site },
+        basis: "registered",
+        site,
+        stripe: live ? { supporters: live.supporters, units: live.units, yen: live.yen, basis: "live" } : null,
+      };
     }
     if (Number.isFinite(linesSinceMs) && monthStartMs >= linesSinceMs && monthEndMs <= nowMs) {
       const billed = billedSupport(receipts, monthStartMs, monthEndMs);
-      return { counts: { ...registered, supportYen: billed.yen, shareSupporters: billed.supporters, shareUnits: billed.units }, basis: "billed", registered };
+      return {
+        counts: { ...registered, supportYen: billed.yen, shareSupporters: billed.supporters, shareUnits: billed.units },
+        basis: "billed",
+        site: monthEndSite,
+        stripe: { supporters: billed.supporters, units: billed.units, yen: billed.yen, basis: "billed" },
+      };
     }
-    return { counts: registered, basis: "registered", registered };
+    return { counts: registered, basis: "registered", site: monthEndSite, stripe: null };
   };
   return (monthYm) => {
     const known = done.get(monthYm) ?? count(monthYm);
@@ -916,7 +1032,7 @@ export function buildMonthReport(
   const operatingYen = Math.round(incomeYen * OPERATING_EXPENSE_RATE);
   const careYen = incomeYen - operatingYen;
 
-  const horseDefaults = horseDefaultCounts(source.horses, endMs);
+  const horseDefaults = horseDefaultCounts(source.horses, startMs, endMs);
   const rescuedHorses =
     horseCountOverride != null && Number.isFinite(horseCountOverride) && horseCountOverride >= 0
       ? Math.round(horseCountOverride)
@@ -962,6 +1078,10 @@ export function buildMonthReport(
     });
   }
 
+  // 管理馬 1頭あたりの支援額。支援合計額（当月は 口数 × 1口の金額）を、管理馬の頭数で割る。
+  const managedHorses = managedHorseCount(source.horses, endMs);
+  const supportPerHorseYen = managedHorses > 0 ? Math.round((counts.supportYen / managedHorses) * 100) / 100 : 0;
+
   return {
     ym,
     label: monthLabel(ym),
@@ -977,6 +1097,7 @@ export function buildMonthReport(
     teamIncomeYen: incomeParts.teamIncomeYen,
     shareIncomeYen: adjusted.shareIncomeYen,
     otherIncomeYen: incomeParts.otherIncomeYen,
+    extraIncome: { youtubeYen: adjusted.youtubeYen, transferYen: adjusted.transferYen, otherYen: adjusted.otherYen },
     incomeYen,
     operatingYen,
     careYen,
@@ -989,12 +1110,11 @@ export function buildMonthReport(
     adjust,
     stripe,
     supportBasis: current.basis,
-    supportPastDueYen: current.basis === "live" ? source.liveSupport?.pastDueYen ?? 0 : 0,
-    registered: {
-      supportYen: current.registered.supportYen,
-      shareSupporters: current.registered.shareSupporters,
-      shareUnits: current.registered.shareUnits,
-    },
+    supportPastDueYen: current.stripe?.basis === "live" ? source.liveSupport?.pastDueYen ?? 0 : 0,
+    registered: current.site,
+    stripeSupport: current.stripe,
+    managedHorses,
+    supportPerHorseYen,
     eventBookings,
     horsesUp: up,
     horsesDown: down,

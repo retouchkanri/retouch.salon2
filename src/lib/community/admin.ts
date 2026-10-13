@@ -79,6 +79,8 @@ export const channelInputSchema = z
     is_required: z.boolean(),
     sort_order: z.number().int().min(-100000).max(100000),
     is_archived: z.boolean().optional(),
+    // コミュニティの画面で、運営を含めて誰にも表示しない（メッセージは残る）
+    is_hidden: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.audience === "plans" && v.audience_plan_codes.length === 0) {
@@ -111,6 +113,7 @@ export async function normalizeChannelInput(admin: Admin, v: ChannelInput) {
     is_required: isPrivate ? false : v.is_required && v.auto_join,
     sort_order: v.sort_order,
     ...(v.is_archived === undefined ? {} : { is_archived: v.is_archived }),
+    ...(v.is_hidden === undefined ? {} : { is_hidden: v.is_hidden }),
   };
 }
 

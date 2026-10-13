@@ -29,7 +29,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/admin", label: "ダッシュボード", emoji: "📊" },
       { href: "/admin/reports", label: "経営管理", emoji: "📅", cap: "payments.manage", fresh: true },
-      { href: "/admin/giving", label: "寄付状況", emoji: "✨", cap: "payments.manage", fresh: true },
+      { href: "/admin/giving", label: "支援状況", emoji: "✨", cap: "payments.manage", fresh: true },
       { href: "/admin/search", label: "横断検索", emoji: "🔍" },
       { href: "/admin/audit-logs", label: "監査ログ", emoji: "🛡️", cap: "audit.view" },
     ],

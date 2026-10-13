@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { FREE_GROUP_AUDIENCES, FREE_GROUP_LABELS, FREE_IDLE_MONTHS, isFreeGroupAudience, type FreeGroupCounts } from "@/lib/freeMemberGroups";
 import { sendMemberMessageUntilDone, type SendProgress } from "@/lib/memberMessagesClient";
 import SendProgressBar from "./SendProgressBar";
 
@@ -28,8 +29,17 @@ const AUDIENCE_OPTIONS = [
   { value: "rpt_only", label: "リタポメンバー" },
   { value: "team_only", label: "がんがんチーム" },
   { value: "no_class", label: "空白の人のみ（無料会員）" },
+  { value: "no_class_donor", label: FREE_GROUP_LABELS.no_class_donor },
+  { value: "no_class_idle", label: FREE_GROUP_LABELS.no_class_idle },
   { value: "subset", label: "手動指定した人のみ" },
 ];
+
+/** 無料会員とその内訳の、いまの人数。 */
+function freeCountOf(value: string, counts: FreeGroupCounts | null | undefined): number | null {
+  if (!counts) return null;
+  if (value === "no_class") return counts.donor + counts.idle + counts.recent + counts.former;
+  return isFreeGroupAudience(value) ? counts[FREE_GROUP_AUDIENCES[value]] : null;
+}
 
 // クライアント側プレビュー用（サーバの messageBodyHtml と同等の最小実装）
 function escapeHtml(s: string): string {
@@ -57,10 +67,16 @@ export default function MemberMessageForm({
   initial,
   id,
   initialTargets,
+  freeGroups,
+  freeGroupsUsable = true,
 }: {
   initial?: any;
   id?: string;
   initialTargets?: TargetCustomer[];
+  /** 無料会員の内訳の人数。読み込めなかったときは null（人数を出さない）。 */
+  freeGroups?: FreeGroupCounts | null;
+  /** 無料会員①②を、このサイトで保存・配信できるか（開発用のサイトでは不可）。 */
+  freeGroupsUsable?: boolean;
 }) {
   const router = useRouter();
   const start = initial ?? {
@@ -385,20 +401,41 @@ export default function MemberMessageForm({
       <div className="space-y-2">
         <label className="label">配信対象（複数選択可）</label>
         <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {AUDIENCE_OPTIONS.map((opt) => (
-            <label key={opt.value} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={audiences.includes(opt.value)}
-                onChange={() => toggleAudience(opt.value)}
-              />
-              <span>{opt.label}</span>
-            </label>
-          ))}
+          {AUDIENCE_OPTIONS.map((opt) => {
+            const count = freeCountOf(opt.value, freeGroups);
+            return (
+              <label key={opt.value} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={audiences.includes(opt.value)}
+                  onChange={() => toggleAudience(opt.value)}
+                />
+                <span>
+                  {opt.label}
+                  {count != null && <>{" "}<span className="text-xs text-ink-mute tabular-nums">{count.toLocaleString("ja-JP")}名</span></>}
+                </span>
+              </label>
+            );
+          })}
         </div>
         {audiences.length === 0 && (
           <p className="text-xs text-danger">配信対象を1つ以上選択してください。</p>
         )}
+        <div className="text-xs text-ink-mute space-y-1">
+          <p>
+            無料会員①②は「空白の人のみ（無料会員）」の内訳です。①は、寄付の記録（カード決済、または銀行振込の申告）がある方。
+            ②は、寄付も会費・一口支援のお支払いもなく、登録から{FREE_IDLE_MONTHS}か月以上たった方です。②だけにチェックを入れると、②の方だけに配信できます。
+          </p>
+          {freeGroups && (
+            <p>
+              ①にも②にも入らない無料会員：登録から{FREE_IDLE_MONTHS}か月未満で寄付のない方 {freeGroups.recent.toLocaleString("ja-JP")}名、
+              以前に会費・一口支援のお支払いがあった方 {freeGroups.former.toLocaleString("ja-JP")}名。
+            </p>
+          )}
+          {!freeGroupsUsable && (
+            <p className="text-amber-700">このサイト（開発用）では、①②の人数の確認だけができます。①②を選んだ保存・配信は、本番サイトで行ってください。</p>
+          )}
+        </div>
 
         {audiences.includes("subset") && (
           <div className="space-y-2">

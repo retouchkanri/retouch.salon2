@@ -3,6 +3,7 @@ import { requireMember } from "@/lib/auth";
 import { loadHorses, loadPlans, loadActiveSupports, loadActiveContract } from "@/lib/customer";
 import { SUPPORT_UNIT_PRICE, isBasicMemberPlanCode } from "@/lib/constraints";
 import { MEMBER_SELF_SERVICE_ENABLED } from "@/lib/featureFlags";
+import { isRecruitmentSlot } from "@/lib/horses";
 import SelfServiceClosedNotice from "@/components/SelfServiceClosedNotice";
 import NewSupportWizard from "./NewSupportWizard";
 
@@ -22,12 +23,14 @@ export default async function NewSupportPage({
     );
   }
 
-  const [horses, plans, existingSupports, contract] = await Promise.all([
+  const [supportableHorses, plans, existingSupports, contract] = await Promise.all([
     loadHorses(true),
     loadPlans(),
     loadActiveSupports(session.customerId),
     loadActiveContract(session.customerId),
   ]);
+  // 新規募集の枠の行は、選べる馬に出さない（公開の馬一覧と同じ扱い）。
+  const horses = supportableHorses.filter((horse) => !isRecruitmentSlot(horse));
 
   const supportPlans = plans.filter((p) => p.code === "SUPPORT");
   // All SUPPORT plans are priced uniformly at SUPPORT_UNIT_PRICE per 口; present a

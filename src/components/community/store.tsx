@@ -1231,8 +1231,9 @@ function createActions(store: Store, db: Db) {
   const inviteMembers = async (channelId: string, userIds: string[]): Promise<boolean> => {
     try {
       const n = await api.inviteMembers(db, channelId, userIds);
-      pushToast({ kind: "info", title: n > 0 ? `${n}人をチャンネルに追加しました。` : "追加できるメンバーはいませんでした。" });
+      pushToast({ kind: "info", title: n > 0 ? `${n}人をチャンネルに追加しました。` : "選んだ人は、すでにこのチャンネルのメンバーです。" });
       void loadMembers(channelId, true);
+      scheduleRefreshChannels();
       return true;
     } catch (e) {
       fail(e, "メンバーを追加できませんでした。");
@@ -1245,8 +1246,56 @@ function createActions(store: Store, db: Db) {
       await api.removeMember(db, channelId, userId);
       void loadMembers(channelId, true);
       if (userId === get().me.id) await refreshChannels();
+      else scheduleRefreshChannels();
     } catch (e) {
       fail(e, "メンバーを外せませんでした。");
+    }
+  };
+
+  /** DM に自分用の名前を付ける（運営のみ。空にすると相手の表示名に戻る）。 */
+  const renameDm = async (channelId: string, label: string): Promise<boolean> => {
+    try {
+      const saved = await api.setDmLabel(db, channelId, label);
+      patchChannel(channelId, { label: saved });
+      pushToast({ kind: "info", title: saved ? "名前を変更しました。" : "相手の表示名に戻しました。" });
+      return true;
+    } catch (e) {
+      fail(e, "名前を変更できませんでした。");
+      return false;
+    }
+  };
+
+  /** 削除した会話を一覧から消し、開いていた場合は次の会話へ移る。 */
+  const dropChannel = async (channelId: string) => {
+    const wasOpen = get().currentId === channelId;
+    set((s) => ({ channels: s.channels.filter((c) => c.id !== channelId) }));
+    if (wasOpen) openChannel(sortedJoinedChannels(get().channels)[0]?.id ?? null);
+    await refreshChannels();
+  };
+
+  /** DM を削除する（運営のみ。メッセージと添付ファイルは相手側を含めてすべて消える）。 */
+  const deleteDm = async (channelId: string): Promise<boolean> => {
+    try {
+      await api.deleteDm(channelId);
+      await dropChannel(channelId);
+      pushToast({ kind: "info", title: "ダイレクトメッセージを削除しました。" });
+      return true;
+    } catch (e) {
+      fail(e, "ダイレクトメッセージを削除できませんでした。");
+      return false;
+    }
+  };
+
+  /** チャンネルを削除する（運営のみ。メッセージと添付ファイルもすべて消える）。 */
+  const deleteChannel = async (channelId: string): Promise<boolean> => {
+    try {
+      await api.deleteChannel(channelId);
+      await dropChannel(channelId);
+      pushToast({ kind: "info", title: "チャンネルを削除しました。" });
+      return true;
+    } catch (e) {
+      fail(e, "チャンネルを削除できませんでした。");
+      return false;
     }
   };
 
@@ -1403,6 +1452,9 @@ function createActions(store: Store, db: Db) {
     loadMembers,
     inviteMembers,
     removeMember,
+    renameDm,
+    deleteDm,
+    deleteChannel,
     loadActivity,
     markActivitySeen,
     saveProfile,

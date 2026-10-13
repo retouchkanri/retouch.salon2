@@ -407,6 +407,43 @@ export function isPrivateChannel(ch: Pick<ChannelRow, "kind" | "visibility" | "a
   return ch.kind === "channel" && (ch.visibility === "private" || ch.audience !== "all");
 }
 
+/**
+ * 自分でチャンネルに参加できるか。運営は制限なし。会員は、会員種別などに応じて自動で参加する
+ * チャンネルに戻るとき（退出後の再参加）だけ。それ以外のチャンネルへの追加は運営が行う。
+ * DB の community_join と同じ規則（画面に出すボタンをそろえるためのもの。判定は DB が行う）。
+ */
+export function canJoinChannel(
+  ch: Pick<ChannelRow, "kind" | "joined" | "is_archived" | "visibility" | "auto_join">,
+  isStaff: boolean,
+): boolean {
+  if (ch.kind !== "channel" || ch.joined || ch.is_archived) return false;
+  return isStaff || (ch.visibility === "public" && ch.auto_join);
+}
+
+/**
+ * チャンネルにメンバーを追加できるか（運営のみ。DB の community_invite と同じ規則）。
+ * 運営は、どのチャンネルにも会員を追加できる（対象者に当てはまらない会員も、運営が追加した会員として参加する）。
+ */
+export function canAddMembers(ch: Pick<ChannelRow, "kind" | "is_archived">, isStaff: boolean): boolean {
+  return isStaff && ch.kind === "channel" && !ch.is_archived;
+}
+
+/**
+ * チャンネルからメンバーを外せるか（DB の community_remove_member と同じ規則）。
+ * 運営はどのチャンネルでも外せる。会員は、自分が作成した非公開チャンネルだけ（いまは会員は作成できない）。
+ */
+export function canRemoveMembers(ch: Pick<ChannelRow, "kind" | "visibility" | "can_manage">, isStaff: boolean): boolean {
+  if (ch.kind !== "channel") return false;
+  return isStaff || (ch.can_manage && ch.visibility === "private");
+}
+
+/** DM の一覧・見出しに出す名前。自分で付けた名前があればそれ、無ければ相手の表示名。 */
+export function dmTitle(ch: Pick<ChannelRow, "label">, peerName: string, isSelf: boolean): string {
+  const label = (ch.label ?? "").trim();
+  if (label) return label;
+  return isSelf ? `${peerName}（自分）` : peerName;
+}
+
 export function sortChannels(list: ChannelRow[]): ChannelRow[] {
   return list.slice().sort((a, b) => a.sort_order - b.sort_order || (a.name ?? "").localeCompare(b.name ?? "", "ja"));
 }

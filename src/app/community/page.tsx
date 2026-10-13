@@ -103,9 +103,24 @@ export default async function CommunityPage({
         </Notice>
       );
     }
+    // 会員種別のない会員（無料会員）
+    if (init.is_free) {
+      return (
+        <Notice title="コミュニティは有料会員の方がご利用いただけます" back={back}>
+          <p>コミュニティは、会員種別（メンバーズ会員・サポーター会員・リェリーフ会員・一口支援など）をお持ちの会員の方がご利用いただけます。</p>
+          <p>
+            会員種別については
+            <Link href="/guide" className="mx-0.5 text-brand underline">
+              入会案内
+            </Link>
+            をご覧ください。
+          </p>
+        </Notice>
+      );
+    }
     return (
       <Notice title="コミュニティをご利用いただけません" back={back}>
-        <p>コミュニティは Retouch 会員の方がご利用いただけます。</p>
+        <p>コミュニティは、会員種別をお持ちの Retouch 会員の方がご利用いただけます。</p>
         <p>会員登録の手続き中の方は、登録完了後にご利用ください。</p>
       </Notice>
     );

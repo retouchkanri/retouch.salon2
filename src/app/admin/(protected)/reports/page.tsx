@@ -2,13 +2,15 @@ import Link from "next/link";
 import { requireCapability } from "@/lib/auth";
 import { LEGACY_END_YM, buildLegacySummary, eraMonthLabel, isLegacyMonth, legacyPeriodLabel } from "@/lib/legacyReport";
 import { SYSTEM_START_YM, currentYearMonth, emptyExpenses, formatYearMonth, monthLabel, parseYearMonth, shiftMonth } from "@/lib/monthlyReport";
-import { loadReportBundle, loadSavedReport } from "@/lib/monthlyReportData";
+import { formatUnits } from "@/lib/format";
+import { loadReportBundle, loadSavedReport, loadSupportReconciliation } from "@/lib/monthlyReportData";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import LegacyReportView from "@/components/reports/LegacyReportView";
 import ReportView from "@/components/reports/ReportView";
 import LegacyPublisher from "./LegacyPublisher";
 import ReportEditor from "./ReportEditor";
 import StripeSummary from "./StripeSummary";
+import SupportReconcile from "./SupportReconcile";
 
 export const dynamic = "force-dynamic";
 
@@ -100,12 +102,16 @@ async function LegacySection() {
 }
 
 async function MonthSection({ ym }: { ym: string }) {
-  const bundle = await loadReportBundle(ym).catch((error: unknown) => ({
-    report: null,
-    saved: null,
-    tableMissing: false,
-    loadError: error instanceof Error ? error.message : "集計を読み込めませんでした。",
-  }));
+  const [bundle, reconcile] = await Promise.all([
+    loadReportBundle(ym).catch((error: unknown) => ({
+      report: null,
+      saved: null,
+      tableMissing: false,
+      loadError: error instanceof Error ? error.message : "集計を読み込めませんでした。",
+    })),
+    // サイトの登録と Stripe の照合は「いま」の状態なので、当月の画面にだけ出す。読めなくても集計は出す。
+    ym === currentYearMonth() ? loadSupportReconciliation(createSupabaseAdminClient()).catch(() => null) : Promise.resolve(null),
+  ]);
   return (
     <>
       {bundle.loadError ? <p className="no-print rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{bundle.loadError}</p> : null}
@@ -128,6 +134,7 @@ async function MonthSection({ ym }: { ym: string }) {
             report={bundle.report}
             expenses={bundle.saved?.expenses ?? emptyExpenses()}
             note={bundle.saved?.note ?? ""}
+            supportHint={reconcile ? `Stripeで支払い中 ${formatUnits(reconcile.billedUnits)} ＋ 振込など ${formatUnits(reconcile.unbilledUnits)}` : undefined}
             trendAction={
               <a
                 href="/api/admin/reports/history"
@@ -139,6 +146,7 @@ async function MonthSection({ ym }: { ym: string }) {
             }
           />
           <StripeSummary report={bundle.report} otherFees={bundle.otherStripeFees ?? null} />
+          {reconcile ? <SupportReconcile data={reconcile} /> : null}
           {/* 月を切り替えたら入力欄を作り直す。前の月の入力が残らないようにする。 */}
           <ReportEditor
             key={ym}

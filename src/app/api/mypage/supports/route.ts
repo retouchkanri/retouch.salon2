@@ -6,6 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { probeSupportItem, syncSupportCreate } from "@/lib/stripeSupport";
 import { SUPPORT_UNIT_PRICE, isBasicMemberPlanCode } from "@/lib/constraints";
+import { isRecruitmentSlot } from "@/lib/horses";
 import { notify, staffRecipients, supportAddedTemplate } from "@/lib/notify";
 import { getStripe } from "@/lib/stripe";
 
@@ -48,7 +49,8 @@ export async function POST(req: Request) {
   if (!plan || plan.code !== "SUPPORT") {
     return NextResponse.json({ error: "支援プランが正しくありません" }, { status: 400 });
   }
-  if (!horse || !horse.is_supportable) {
+  // 新規募集の枠の行は、支援の申込み先にしない（一覧にも出していない）。
+  if (!horse || !horse.is_supportable || isRecruitmentSlot(horse)) {
     return NextResponse.json({ error: "この馬は現在支援を受け付けていません" }, { status: 400 });
   }
   if (!customer) {

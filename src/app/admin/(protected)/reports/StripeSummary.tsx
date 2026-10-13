@@ -16,7 +16,6 @@ const TD = "py-2 pl-3 text-right tabular-nums whitespace-nowrap";
 const BASIS_LABEL = {
   billed: "この月に Stripe が課金した定期課金",
   live: "いま Stripe で有効な定期課金",
-  registered: "サイトの登録（Stripe の記録を読み込めなかったため）",
 } as const;
 
 function netOf(bucket: StripeBucket): number {
@@ -33,7 +32,9 @@ export default function StripeSummary({ report, otherFees }: { report: MonthRepo
     const bucket = stripe.kinds[kind];
     return kind !== "other" || bucket.grossYen !== 0 || bucket.refundYen !== 0;
   });
-  const supportGap = report.counts.supportYen - report.registered.supportYen;
+  // 当月の上の表示（継続支援者・支援合計額）はサイトの登録。ここでは Stripe が課金している数字と並べる。
+  const stripeSupport = report.stripeSupport;
+  const supportGap = stripeSupport ? stripeSupport.yen - report.registered.supportYen : 0;
 
   return (
     <section className="card no-print">
@@ -87,23 +88,25 @@ export default function StripeSummary({ report, otherFees }: { report: MonthRepo
       ) : null}
       <div className="mt-4 rounded-lg bg-surface-soft p-3 text-sm">
         <p className="font-medium">一口支援の月額</p>
-        <p className="mt-1">
-          Stripe：<span className="font-bold tabular-nums">{formatYen(report.counts.supportYen)}</span>（{report.counts.shareSupporters}名・{formatUnits(report.counts.shareUnits)}）
-          <span className="text-ink-mute"> … {BASIS_LABEL[report.supportBasis]}</span>
-        </p>
-        {report.supportPastDueYen > 0 ? <p className="text-ink-mute">ほかに、支払いが遅れている定期課金が {formatYen(report.supportPastDueYen)} あります。</p> : null}
-        {report.supportBasis !== "registered" ? (
+        {stripeSupport ? (
           <p className="mt-1">
-            サイトの登録：<span className="tabular-nums">{formatYen(report.registered.supportYen)}</span>（{report.registered.shareSupporters}名・{formatUnits(report.registered.shareUnits)}）
-            {supportGap !== 0 ? (
-              <>
-                {" "}→ 差 <span className={`font-bold tabular-nums ${supportGap > 0 ? "text-rose-700" : ""}`}>{supportGap > 0 ? "+" : "−"}{formatYen(Math.abs(supportGap))}</span>。
-                サイトの登録には銀行振込・口座引落の支援も入ります。Stripe の方が多いときは、登録もれの支援があります。
-                <Link className="ml-1 text-brand underline" href="/admin/supports">支援の登録を見る</Link>
-              </>
-            ) : "（一致）"}
+            Stripe：<span className="font-bold tabular-nums">{formatYen(stripeSupport.yen)}</span>（{stripeSupport.supporters}名・{formatUnits(stripeSupport.units)}）
+            <span className="text-ink-mute"> … {BASIS_LABEL[stripeSupport.basis]}</span>
           </p>
-        ) : null}
+        ) : (
+          <p className="mt-1 text-ink-mute">Stripe の記録を読み込めなかったため、サイトの登録だけを表示しています。</p>
+        )}
+        {report.supportPastDueYen > 0 ? <p className="text-ink-mute">ほかに、支払いが遅れている定期課金が {formatYen(report.supportPastDueYen)} あります。</p> : null}
+        <p className="mt-1">
+          サイトの登録：<span className="tabular-nums">{formatYen(report.registered.supportYen)}</span>（{report.registered.shareSupporters}名・{formatUnits(report.registered.shareUnits)}）
+          {!stripeSupport ? null : supportGap !== 0 ? (
+            <>
+              {" "}→ 差 <span className={`font-bold tabular-nums ${supportGap > 0 ? "text-rose-700" : ""}`}>{supportGap > 0 ? "+" : "−"}{formatYen(Math.abs(supportGap))}</span>。
+              サイトの登録には銀行振込・口座引落の支援も入ります。Stripe の方が多いときは、登録もれの支援があります。
+              <Link className="ml-1 text-brand underline" href="/admin/supports">支援の登録を見る</Link>
+            </>
+          ) : "（一致）"}
+        </p>
       </div>
     </section>
   );

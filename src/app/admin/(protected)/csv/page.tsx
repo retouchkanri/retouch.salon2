@@ -30,6 +30,10 @@ export default async function CsvPage() {
         <p className="text-sm text-ink-soft mb-3">
           会員情報の一括出力／取込ができます。エクスポートした CSV の列名は、そのままインポート時のキーになります。
         </p>
+        <p className="text-sm text-ink-soft mb-3">
+          エクスポートした CSV の右端には、いまの <strong>会員種別</strong>・<strong>特別参加</strong>・<strong>支援口数</strong>・
+          <strong>支援先と口数</strong>（どの馬に何口か）が付きます。顧客一覧と同じ内容で、出力専用です。この列が付いたまま取り込んでも、会員種別や支援は変わりません。
+        </p>
         <CsvTools
           exportHref="/api/admin/csv/customers"
           importHref="/api/admin/csv/customers"
@@ -119,6 +123,13 @@ export default async function CsvPage() {
           <li><code>gender</code>：male / female / other / unspecified</li>
           <li><code>status</code>：active / suspended / withdrawn</li>
           <li><code>stripe_customer_id</code>：既存の Stripe 顧客 ID</li>
+        </ul>
+        <p className="mt-2">出力のみ（取込では読みません）</p>
+        <ul className="list-disc list-inside space-y-1">
+          <li><code>会員種別</code>：メンバーズ会員 / アテンダー会員 / サポーター会員 / リェリーフ会員 / オーナーズ会員 / ヘルパーズ会員（一口支援のみ）/ 無料会員。リタポ・特別チームだけの方は「—」</li>
+          <li><code>特別参加</code>：リタポメンバー、特別チーム：チーム名</li>
+          <li><code>支援口数</code>：いま支援中の口数の合計（例: 2.5）。支援のない方は空欄</li>
+          <li><code>支援先と口数</code>：どの馬に何口か（例: 馬名Aに1口、馬名Bに0.5口）。決済失敗中の支援は「（決済失敗中）」と付き、支援口数には入りません</li>
         </ul>
         <p className="font-bold mt-3">支援 supports.csv</p>
         <ul className="list-disc list-inside space-y-1">

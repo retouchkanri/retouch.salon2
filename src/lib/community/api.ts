@@ -85,6 +85,7 @@ export function normalizeChannel(raw: any): ChannelRow {
     last_message_preview: raw.last_message_preview ?? null,
     last_message_user_id: raw.last_message_user_id ?? null,
     member_count: Number(raw.member_count ?? 0) || 0,
+    label: typeof raw.label === "string" && raw.label ? raw.label : null,
   } as ChannelRow;
 }
 
@@ -224,6 +225,39 @@ export function setPrefs(
 
 export function openDm(db: Db, userId: string): Promise<string> {
   return rpc<string>(db, "community_open_dm", { p_user: userId }, "ダイレクトメッセージを開けませんでした。");
+}
+
+/** DM に自分用の名前を付ける（運営のみ。空文字で名前を消す）。保存した名前（消したときは null）を返す。 */
+export async function setDmLabel(db: Db, channelId: string, label: string): Promise<string | null> {
+  const saved = await rpc<string | null>(
+    db,
+    "community_set_dm_label",
+    { p_channel: channelId, p_label: label },
+    "名前を変更できませんでした。",
+  );
+  return saved ? saved : null;
+}
+
+/** サーバー側の削除 API を呼ぶ（運営のみ）。成功しなかった場合はメッセージつきの Error。 */
+async function deleteVia(url: string, fallback: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "DELETE", credentials: "same-origin" });
+  } catch {
+    throw new Error("通信に失敗しました。接続を確認して、もう一度お試しください。");
+  }
+  const j = await res.json().catch(() => null);
+  if (!res.ok || j?.ok !== true) throw new Error(j?.error ?? fallback);
+}
+
+/** DM を削除する（運営のみ・自分が参加している DM。メッセージと添付ファイルは相手側を含めてすべて消える）。 */
+export function deleteDm(channelId: string): Promise<void> {
+  return deleteVia(`/api/community/dms/${channelId}`, "ダイレクトメッセージを削除できませんでした。");
+}
+
+/** チャンネルを削除する（運営のみ。管理画面と同じ API。メッセージと添付ファイルもすべて消える）。 */
+export function deleteChannel(channelId: string): Promise<void> {
+  return deleteVia(`/api/admin/community/channels/${channelId}`, "チャンネルを削除できませんでした。");
 }
 
 // ---------------------------------------------------------------------------

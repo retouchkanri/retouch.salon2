@@ -4,11 +4,15 @@ import {
   activeMentionQuery,
   applyFormat,
   attachmentPath,
+  canAddMembers,
+  canJoinChannel,
+  canRemoveMembers,
   channelNameProblem,
   normalizeChannelName,
   badgeCount,
   dayKey,
   decodeMentions,
+  dmTitle,
   effectiveNotify,
   encodeMentions,
   formatDayLabel,
@@ -262,4 +266,49 @@ test("applyFormat wraps selections and prefixes lines", () => {
   assert.equal(applyFormat("引用", 1, 1, "quote").text, "> 引用");
   assert.equal(applyFormat("見て", 0, 2, "link", "https://e.com").text, "見て https://e.com");
   assert.equal(applyFormat("abc", 0, 3, "link", "  ").text, "abc");
+});
+
+test("members can only come back to a channel they are added to automatically; staff can join any", () => {
+  const ch = { kind: "channel" as const, joined: false, is_archived: false, visibility: "public" as const, auto_join: true };
+  // 会員種別のチャンネルなど（自動で参加）: 退出したあと、自分で戻れる
+  assert.equal(canJoinChannel(ch, false), true);
+  // 自動で参加しない公開チャンネル・非公開チャンネル: 会員は自分では参加できない（運営が追加する）
+  assert.equal(canJoinChannel({ ...ch, auto_join: false }, false), false);
+  assert.equal(canJoinChannel({ ...ch, visibility: "private", auto_join: false }, false), false);
+  assert.equal(canJoinChannel({ ...ch, auto_join: false }, true), true);
+  assert.equal(canJoinChannel({ ...ch, visibility: "private", auto_join: false }, true), true);
+  // 参加中・アーカイブ済み・DM には「参加する」を出さない
+  assert.equal(canJoinChannel({ ...ch, joined: true }, true), false);
+  assert.equal(canJoinChannel({ ...ch, is_archived: true }, true), false);
+  assert.equal(canJoinChannel({ ...ch, kind: "dm" }, true), false);
+});
+
+test("staff can add and remove members on every channel; members cannot", () => {
+  const ch = { kind: "channel" as const, is_archived: false, visibility: "private" as const, can_manage: false };
+  // 運営は、非公開・公開（対象者が決まっているチャンネルを含む）のどれでも追加・削除できる
+  const publicCh = { ...ch, visibility: "public" as const };
+  assert.equal(canAddMembers(ch, true), true);
+  assert.equal(canAddMembers(publicCh, true), true);
+  assert.equal(canRemoveMembers(ch, true), true);
+  assert.equal(canRemoveMembers(publicCh, true), true);
+  // 会員は、参加しているチャンネルでもメンバーを追加・削除できない
+  assert.equal(canAddMembers(ch, false), false);
+  assert.equal(canRemoveMembers(ch, false), false);
+  assert.equal(canRemoveMembers({ ...ch, visibility: "public" }, false), false);
+  // 自分が作成した非公開チャンネル（以前に作成されたもの）だけは、作成者が外せる
+  assert.equal(canRemoveMembers({ ...ch, can_manage: true }, false), true);
+  assert.equal(canRemoveMembers({ ...ch, can_manage: true, visibility: "public" }, false), false);
+  // アーカイブ済み・DM には出さない
+  assert.equal(canAddMembers({ ...ch, is_archived: true }, true), false);
+  assert.equal(canAddMembers({ ...ch, kind: "dm" as const }, true), false);
+  assert.equal(canRemoveMembers({ ...ch, kind: "dm" }, true), false);
+});
+
+test("a DM shows the name the viewer gave it, otherwise the other person's name", () => {
+  assert.equal(dmTitle({ label: null }, "ハルちゃん", false), "ハルちゃん");
+  assert.equal(dmTitle({ label: undefined }, "管理者", true), "管理者（自分）");
+  assert.equal(dmTitle({ label: "山田様（サポーター）" }, "ハルちゃん", false), "山田様（サポーター）");
+  // 空白だけの名前は、名前なしと同じ
+  assert.equal(dmTitle({ label: "   " }, "ハルちゃん", false), "ハルちゃん");
+  assert.equal(dmTitle({ label: "メモ" }, "管理者", true), "メモ");
 });

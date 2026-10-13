@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildGivingInsight, isFoundingSupporter, supportStars } from "../src/lib/donationInsight";
+import { buildGivingInsight, isFoundingSupporter, moverCustomerIds, supportStars } from "../src/lib/donationInsight";
 import type { ReportSource } from "../src/lib/monthlyReport";
 
 test("support stars grow every six months and stop at five", () => {
@@ -111,4 +111,56 @@ test("only horses that are open for support are flagged as having no units", () 
   assert.ok(insight);
   assert.deepEqual(insight.shortHorses.map((horse) => horse.id), ["open"]);
   assert.equal(insight.signals.some((signal) => signal.title === "支援口数が付いていない馬 1頭"), true);
+});
+
+test("each increase and decrease of units names the people behind it", () => {
+  const source: ReportSource = {
+    customers: [],
+    bookings: [],
+    contracts: [],
+    donations: [],
+    payments: [],
+    horses: [
+      { id: "hana", name: "01：花", created_at: "2020-01-01T00:00:00.000Z" },
+      { id: "ume", name: "02：梅", created_at: "2020-01-01T00:00:00.000Z" },
+    ],
+    supports: [
+      // 花：a は続けている。b は 10/3 に 1口で始めた。c は 10/4 に 0.5口で始めた。
+      { customer_id: "a", horse_id: "hana", units: 1, monthly_amount: 12000, started_at: "2026-08-01T00:00:00.000Z", canceled_at: null, status: "active" },
+      { customer_id: "b", horse_id: "hana", units: 1, monthly_amount: 12000, started_at: "2026-10-03T00:00:00.000Z", canceled_at: null, status: "active" },
+      { customer_id: "c", horse_id: "hana", units: 0.5, monthly_amount: 6000, started_at: "2026-10-04T00:00:00.000Z", canceled_at: null, status: "active" },
+      // 梅：d は 10/6 に 2口を停止した。e は 10/8 に 2口をやめて、同じ日に 1口で登録し直した（1口の減少）。
+      { customer_id: "d", horse_id: "ume", units: 2, monthly_amount: 24000, started_at: "2026-07-01T00:00:00.000Z", canceled_at: "2026-10-06T00:00:00.000Z", status: "canceled" },
+      { customer_id: "e", horse_id: "ume", units: 2, monthly_amount: 24000, started_at: "2026-07-01T00:00:00.000Z", canceled_at: "2026-10-08T00:00:00.000Z", status: "canceled" },
+      { customer_id: "e", horse_id: "ume", units: 1, monthly_amount: 12000, started_at: "2026-10-08T00:00:00.000Z", canceled_at: null, status: "active" },
+      // 支払いが済んでいない申込は、増えた人に数えない。
+      { customer_id: "f", horse_id: "hana", units: 1, monthly_amount: 12000, started_at: "2026-10-09T00:00:00.000Z", canceled_at: null, status: "incomplete" },
+    ],
+  };
+  const insight = buildGivingInsight(source, "2026-10", new Date("2026-10-20T00:00:00.000Z"));
+  assert.ok(insight);
+
+  // 口数が増えた馬の下に、増やした人が口数の大きい順に並ぶ。人ごとの口数を足すと、馬の増えた口数になる。
+  assert.equal(insight.bright.gained.length, 1);
+  const hana = insight.bright.gained[0];
+  assert.equal(hana.deltaUnits, 1.5);
+  assert.deepEqual(hana.people.map((mover) => [mover.customerId, mover.deltaUnits]), [["b", 1], ["c", 0.5]]);
+  assert.equal(hana.people.reduce((sum, mover) => sum + mover.deltaUnits, 0), hana.deltaUnits);
+
+  // 支援停止の件数と同じ数だけ、人が並ぶ（新しい停止が先）。続けている口数があれば添える。
+  assert.equal(insight.stoppedSupports, 2);
+  assert.deepEqual(
+    insight.stopped.map((mover) => [mover.customerId, mover.horseName, mover.deltaUnits, mover.keptUnits ?? 0]),
+    [["e", "02：梅", -2, 1], ["d", "02：梅", -2, 0]],
+  );
+  const stopSignal = insight.signals.find((signal) => signal.title === "支援停止 2件");
+  assert.equal(stopSignal?.peopleMode, "stopped");
+  assert.equal(stopSignal?.people?.length, 2);
+
+  // 馬ごとの増減には、差し引きの口数で出る（登録し直した e は 1口の減少）。
+  const ume = insight.horses.find((horse) => horse.id === "ume");
+  assert.equal(ume?.deltaUnits, -3);
+  assert.deepEqual(ume?.people.map((mover) => [mover.customerId, mover.deltaUnits]), [["d", -2], ["e", -1]]);
+
+  assert.deepEqual(moverCustomerIds(insight).sort(), ["b", "c", "d", "e"]);
 });

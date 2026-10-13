@@ -102,7 +102,7 @@ export default function HeaderUserMenu({ name, email, role, badge, avatarUrl }: 
             </Link>
           )}
           <div className="border-t border-surface-line mt-1 pt-1">
-            <form action="/api/auth/logout?next=/" method="post">
+            <form action="/api/auth/logout" method="post">
               <button
                 type="submit"
                 className="w-full text-left px-4 py-2 text-sm text-danger hover:bg-surface-soft"

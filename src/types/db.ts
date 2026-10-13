@@ -266,6 +266,8 @@ export type MemberMessageAudience =
   | "rpt_only"
   | "support_only"
   | "no_class"
+  | "no_class_donor"
+  | "no_class_idle"
   | "class_attender"
   | "class_owner"
   | "class_b"

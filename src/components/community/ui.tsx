@@ -12,6 +12,7 @@ export type ModalState =
   | { type: "create"; visibility?: "public" | "private" }
   | { type: "details"; channelId: string; tab?: DetailsTab }
   | { type: "invite"; channelId: string }
+  | { type: "dm"; channelId: string }
   | { type: "search"; channelId: string | null }
   | { type: "pinned"; channelId: string }
   | { type: "report"; message: Message }

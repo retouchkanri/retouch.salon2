@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireCapability } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { formatDate } from "@/lib/format";
+import { FREE_GROUP_LABELS } from "@/lib/freeMemberGroups";
+import { countFreeMemberGroups } from "@/lib/memberMessages";
 import MemberMessageForm from "./MemberMessageForm";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -16,6 +18,7 @@ const AUDIENCE_LABEL: Record<string, string> = {
   rpt_only: "リタポメンバー",
   support_only: "1口支援者のみ",
   no_class: "空白の人のみ（無料会員）",
+  ...FREE_GROUP_LABELS,
   subset: "指定会員",
   class_attender: "アテンダー会員",
   class_owner: "オーナーズ会員",
@@ -34,10 +37,11 @@ function audienceLabel(m: any): string {
 export default async function MemberMessagesPage() {
   await requireCapability("messages.manage");
   const admin = createSupabaseAdminClient();
-  const { data: items } = await admin
-    .from("member_messages")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const [{ data: items }, freeGroups] = await Promise.all([
+    admin.from("member_messages").select("*").order("created_at", { ascending: false }),
+    // 人数が読めなくても、フォームは人数なしで使える。
+    countFreeMemberGroups(admin).catch(() => null),
+  ]);
 
   // メール配信で送信数が配信先に達していないものは、失敗／未送信の正確な内訳を出す
   // （recipient_count - sent_count には配信対象外(skipped)も含まれ、誤解を招くため）。
@@ -74,7 +78,7 @@ export default async function MemberMessagesPage() {
 
       <section className="space-y-2">
         <h2 className="font-bold">新規作成</h2>
-        <MemberMessageForm />
+        <MemberMessageForm freeGroups={freeGroups} freeGroupsUsable={process.env.NODE_ENV === "production"} />
       </section>
 
       <section className="space-y-2">

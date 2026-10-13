@@ -4,7 +4,6 @@ import { useEffect, useId, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatUnits } from "@/lib/format";
-import EmergencyHorseImage from "@/components/EmergencyHorseImage";
 import horsePortrait from "@/assets/images/horse-portrait.jpg";
 
 export type HorseCardData = {
@@ -13,7 +12,6 @@ export type HorseCardData = {
   profile: string | null;
   imageUrl: string | null;
   isSupportable: boolean;
-  emergency: boolean;
   totalUnits: number;
   supporters: number;
   nicknames: string[];
@@ -31,15 +29,6 @@ function HorseThumb({
   horse: HorseCardData;
   sizeClass: string;
 }) {
-  if (horse.emergency) {
-    return (
-      <EmergencyHorseImage
-        name={horse.name}
-        sizeClass={sizeClass}
-        imageUrl={horse.imageUrl}
-      />
-    );
-  }
   return (
     <div className={`${sizeClass} rounded-lg overflow-hidden shrink-0 bg-brand-50`}>
       {horse.imageUrl ? (
@@ -54,9 +43,6 @@ function HorseThumb({
 
 function StatusLine({ horse }: { horse: HorseCardData }) {
   const hasSupport = horse.totalUnits > 0;
-  if (horse.emergency) {
-    return <p className="text-xs text-pink-600 font-semibold mt-0.5">★支援募集開始★</p>;
-  }
   if (hasSupport) {
     return (
       <p className="text-xs text-ink-soft mt-0.5">
@@ -101,18 +87,14 @@ export default function HorsesSupportGrid({ horses }: Props) {
               type="button"
               onClick={() => setSelectedId(horse.id)}
               className={`relative rounded-xl border flex flex-col text-left transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40
-                ${horse.emergency
-                  ? "border-pink-300 bg-pink-50/30"
-                  : hasSupport
-                    ? "border-surface-line bg-white"
-                    : "border-dashed border-brand/30 bg-brand-50/20"}`}
+                ${hasSupport
+                  ? "border-surface-line bg-white"
+                  : "border-dashed border-brand/30 bg-brand-50/20"}`}
             >
               <div className="flex items-center gap-3 p-3">
                 <HorseThumb horse={horse} sizeClass="w-14 h-14" />
                 <div className="min-w-0 flex-1">
-                  <p className={`font-bold truncate ${horse.emergency ? "text-pink-700" : "text-ink"}`}>
-                    {horse.name}
-                  </p>
+                  <p className="font-bold truncate text-ink">{horse.name}</p>
                   <StatusLine horse={horse} />
                 </div>
               </div>
@@ -138,12 +120,7 @@ export default function HorsesSupportGrid({ horses }: Props) {
 
               {horse.isSupportable && (
                 <div className="mt-auto px-3 pb-3 pt-1">
-                  <span
-                    className={`block w-full text-center text-xs font-bold py-1.5 rounded-lg
-                      ${horse.emergency
-                        ? "bg-pink-500 text-white"
-                        : "bg-brand text-white"}`}
-                  >
+                  <span className="block w-full text-center text-xs font-bold py-1.5 rounded-lg bg-brand text-white">
                     この馬を支援する
                   </span>
                 </div>
@@ -169,10 +146,7 @@ export default function HorsesSupportGrid({ horses }: Props) {
             <div className="flex items-start gap-4 p-5 sm:p-6 border-b border-surface-line shrink-0">
               <HorseThumb horse={selected} sizeClass="w-20 h-20" />
               <div className="min-w-0 flex-1">
-                <h3
-                  id={titleId}
-                  className={`font-bold text-lg sm:text-xl leading-snug ${selected.emergency ? "text-pink-700" : "text-ink"}`}
-                >
+                <h3 id={titleId} className="font-bold text-lg sm:text-xl leading-snug text-ink">
                   {selected.name}
                 </h3>
                 <StatusLine horse={selected} />
@@ -219,10 +193,7 @@ export default function HorsesSupportGrid({ horses }: Props) {
                 閉じる
               </button>
               {selected.isSupportable && (
-                <Link
-                  href={selected.supportHref}
-                  className={`btn-primary ${selected.emergency ? "!bg-pink-500 hover:!bg-pink-600" : ""}`}
-                >
+                <Link href={selected.supportHref} className="btn-primary">
                   この馬を支援する
                 </Link>
               )}

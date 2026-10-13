@@ -14,8 +14,19 @@ import {
   type LiveSupport,
 } from "@/lib/monthlyReport";
 import { getStripe } from "@/lib/stripe";
+import type { StripeSupportPayer } from "@/lib/supportReconcile";
 
-type LiveItem = { status: string; customer: string; productName: string; monthlyYen: number };
+export type LiveItem = {
+  status: string;
+  /** 支払っている人。メールアドレス、無ければ Stripe の顧客ID。 */
+  customer: string;
+  productName: string;
+  monthlyYen: number;
+  email?: string | null;
+  stripeCustomerId?: string | null;
+};
+
+export type LiveSupportDetail = { summary: LiveSupport; payers: StripeSupportPayer[] };
 
 /** 月額に直す。毎月課金以外（年額など）は月割りにする。 */
 function monthlyYen(item: Stripe.SubscriptionItem): number {
@@ -47,7 +58,29 @@ export function summarizeLiveSupport(items: LiveItem[], ym: string): LiveSupport
   return { ym, yen, supporters: supporters.size, units: Math.round((yen / SUPPORT_UNIT_YEN) * 2) / 2, pastDueYen };
 }
 
-async function fetchLiveSupport(): Promise<LiveSupport | null> {
+/** 一口支援を払っている人ごとの口数。サイトの登録との照合に使う。 */
+export function summarizeLivePayers(items: LiveItem[]): StripeSupportPayer[] {
+  const byPayer = new Map<string, { email: string | null; ids: Set<string>; units: number; pastDueUnits: number }>();
+  for (const item of items) {
+    if (incomeKindOfLine(item.productName) !== "share" || item.monthlyYen <= 0) continue;
+    const paying = item.status === "active" || item.status === "trialing";
+    if (!paying && item.status !== "past_due") continue;
+    const payer = byPayer.get(item.customer) ?? { email: item.email ?? null, ids: new Set<string>(), units: 0, pastDueUnits: 0 };
+    if (item.stripeCustomerId) payer.ids.add(item.stripeCustomerId);
+    const units = item.monthlyYen / SUPPORT_UNIT_YEN;
+    if (paying) payer.units += units;
+    else payer.pastDueUnits += units;
+    byPayer.set(item.customer, payer);
+  }
+  return [...byPayer.values()].map((payer) => ({
+    email: payer.email,
+    stripeCustomerIds: [...payer.ids],
+    units: payer.units,
+    pastDueUnits: payer.pastDueUnits,
+  }));
+}
+
+async function fetchLiveSupportDetail(): Promise<LiveSupportDetail | null> {
   const stripe = getStripe();
   if (!stripe) return null;
 
@@ -69,14 +102,22 @@ async function fetchLiveSupport(): Promise<LiveSupport | null> {
       // 人数はメールアドレスで数える。
       const owner = subscription.customer;
       const email = typeof owner !== "string" && !owner.deleted ? owner.email : null;
-      const customer = email?.trim().toLowerCase() || (typeof owner === "string" ? owner : owner.id);
+      const stripeCustomerId = typeof owner === "string" ? owner : owner.id;
+      const customer = email?.trim().toLowerCase() || stripeCustomerId;
       for (const item of list) {
         const product = typeof item.price.product === "string" ? item.price.product : item.price.product.id;
-        items.push({ status: subscription.status, customer, productName: productNames.get(product) ?? "", monthlyYen: monthlyYen(item) });
+        items.push({
+          status: subscription.status,
+          customer,
+          productName: productNames.get(product) ?? "",
+          monthlyYen: monthlyYen(item),
+          email: email?.trim().toLowerCase() || null,
+          stripeCustomerId,
+        });
       }
     }
   }
-  return summarizeLiveSupport(items, currentYearMonth());
+  return { summary: summarizeLiveSupport(items, currentYearMonth()), payers: summarizeLivePayers(items) };
 }
 
 /**
@@ -115,13 +156,18 @@ export async function loadStripeOtherFees(ym: string): Promise<{ yen: number; co
 }
 
 // Stripe の定期課金を全部たどるので数秒かかる。10分は同じ結果を使う。
-const cachedLiveSupport = unstable_cache(fetchLiveSupport, ["stripe-live-support"], { revalidate: 600 });
+const cachedLiveSupportDetail = unstable_cache(fetchLiveSupportDetail, ["stripe-live-support-detail"], { revalidate: 600 });
 
-export async function loadLiveSupport(): Promise<LiveSupport | null> {
+/** 合計と、人ごとの口数。1 回の読み込みを、経営管理の数字と照合の一覧の両方に使う。 */
+export async function loadLiveSupportDetail(): Promise<LiveSupportDetail | null> {
   try {
-    return await cachedLiveSupport();
+    return await cachedLiveSupportDetail();
   } catch {
     // Next.js の外（スクリプトやテスト）ではキャッシュが使えない。そのまま取りに行く。
-    return fetchLiveSupport();
+    return fetchLiveSupportDetail();
   }
+}
+
+export async function loadLiveSupport(): Promise<LiveSupport | null> {
+  return (await loadLiveSupportDetail())?.summary ?? null;
 }

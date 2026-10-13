@@ -71,7 +71,7 @@ export const AUDIENCES = ["all", "plans", "supporters", "staff"] as const;
 export type ChannelAudience = (typeof AUDIENCES)[number];
 
 export const AUDIENCE_LABELS: Record<ChannelAudience, string> = {
-  all: "全会員",
+  all: "全会員（コミュニティを利用できる有料会員）",
   plans: "会員種別（ランク）指定",
   supporters: "支援者（馬を指定）",
   staff: "運営のみ",
@@ -108,7 +108,7 @@ export function describeAudience(
   if (ch.visibility === "private") return "非公開（招待したメンバーのみ）";
   switch (ch.audience) {
     case "all":
-      return "全会員";
+      return "コミュニティを利用できる会員全員";
     case "staff":
       return "運営のみ";
     case "plans":
@@ -120,6 +120,39 @@ export function describeAudience(
     default:
       return "";
   }
+}
+
+/**
+ * 管理画面でチャンネルを分けて表示するグループ（上から順に表示する）。
+ *   public: 全会員に表示する公開チャンネル / member: 会員種別ごとのチャンネル /
+ *   staff: 運営だけのチャンネル / horse: 支援馬ごとのチャンネル /
+ *   other: どれにも当てはまらないもの（招待制のチャンネルなど。あるときだけ表示する）
+ */
+export const CHANNEL_GROUPS = [
+  { key: "public", label: "公開チャンネル", note: "コミュニティを利用できる会員（有料会員）全員に表示するチャンネルです。" },
+  { key: "member", label: "会員チャンネル", note: "その会員種別の方だけに表示されます（ほかの会員には表示されません）。" },
+  { key: "staff", label: "運営チャンネル", note: "運営だけに表示されます（会員には表示されません）。" },
+  { key: "horse", label: "支援馬のチャンネル", note: "その馬を支援している方だけに表示されます（ほかの会員には表示されません）。" },
+  { key: "other", label: "その他のチャンネル", note: "運営が追加したメンバーだけに表示するチャンネルです。" },
+] as const;
+export type ChannelGroupKey = (typeof CHANNEL_GROUPS)[number]["key"];
+
+/**
+ * チャンネルがどのグループか。分類（category）と対象者（audience）で決める。
+ * 分類が「一般」「お知らせ」のチャンネルは、公開・非公開や非表示の設定を変えても公開チャンネルのグループに
+ * 置いたままにする（設定を切り替えるたびに別のグループへ動かないようにするため。状態は行ごとに表示する）。
+ */
+export function channelGroupOf(ch: {
+  category: string;
+  visibility: "public" | "private";
+  audience: string;
+}): ChannelGroupKey {
+  if (ch.category === "staff" || ch.audience === "staff") return "staff";
+  if (ch.category === "supporters" || ch.audience === "supporters") return "horse";
+  if (ch.category === "rank" || ch.audience === "plans") return "member";
+  if (ch.category === "general" || ch.category === "announcement") return "public";
+  if (ch.visibility === "public" && ch.audience === "all") return "public";
+  return "other";
 }
 
 /** 「会員専用（有料会員種別をお持ちの方）」のプリセット。 */

@@ -7,8 +7,6 @@ import horseImage from "@/assets/images/horse.png";
 import type { Horse, MembershipPlan } from "@/types/db";
 import { SUPPORT_UNIT_PRICE } from "@/lib/constraints";
 import { formatYen } from "@/lib/format";
-import { isEmergencyRecruitmentHorse } from "@/lib/horses";
-import EmergencyHorseImage from "@/components/EmergencyHorseImage";
 
 type Props = {
   horses: Horse[];
@@ -79,18 +77,11 @@ export default function NewSupportWizard({ horses, plan, existingHorseIds, confl
           <div className="grid gap-2 max-h-[55vh] overflow-auto">
             {horses.map((h) => {
               const owned = existingHorseIds.includes(h.id);
-              const emergency = isEmergencyRecruitmentHorse(h);
               return (
                 <label
                   key={h.id}
                   className={`border-2 rounded-xl p-3 flex items-center gap-3 cursor-pointer
-                    ${horseId === h.id
-                      ? emergency
-                        ? "border-pink-500 bg-pink-50"
-                        : "border-brand bg-brand-50"
-                      : emergency
-                        ? "border-pink-300 bg-pink-50/40"
-                        : "border-surface-line"}`}
+                    ${horseId === h.id ? "border-brand bg-brand-50" : "border-surface-line"}`}
                 >
                   <input
                     type="radio"
@@ -99,9 +90,7 @@ export default function NewSupportWizard({ horses, plan, existingHorseIds, confl
                     checked={horseId === h.id}
                     onChange={() => setHorseId(h.id)}
                   />
-                  {emergency ? (
-                    <EmergencyHorseImage name={h.name} />
-                  ) : h.image_url ? (
+                  {h.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={h.image_url} alt={h.name} className="w-14 h-14 rounded-xl object-cover shrink-0" />
                   ) : (
@@ -110,16 +99,11 @@ export default function NewSupportWizard({ horses, plan, existingHorseIds, confl
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className={`font-bold ${emergency ? "text-pink-700" : ""}`}>
+                    <p className="font-bold">
                       {h.name}
-                      {emergency && (
-                        <span className="chip ml-2 !bg-pink-100 !text-pink-800 !border-pink-200 text-xs">
-                          支援募集開始
-                        </span>
-                      )}
                       {owned && <span className="chip-warn ml-2">支援中（口数を追加）</span>}
                     </p>
-                    <p className={`text-xs line-clamp-2 ${emergency ? "text-pink-600 font-medium" : "text-ink-soft"}`}>
+                    <p className="text-xs line-clamp-2 text-ink-soft">
                       {h.profile ?? ""}
                     </p>
                   </div>

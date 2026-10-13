@@ -5,6 +5,7 @@ import { MEMBER_CODES, type MemberCode } from "@/lib/community/constants";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import CommunityTabs from "../../CommunityTabs";
 import ChannelForm, { type ChannelFormValue } from "../ChannelForm";
+import ChannelImage from "../ChannelImage";
 import ChannelMembers from "../ChannelMembers";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export default async function EditCommunityChannelPage({
     is_required: !!ch.is_required,
     sort_order: Number(ch.sort_order ?? 0),
     is_archived: !!ch.is_archived,
+    is_hidden: !!ch.is_hidden,
   };
 
   return (
@@ -54,19 +56,24 @@ export default async function EditCommunityChannelPage({
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold mr-auto">チャンネルを編集: {ch.name}</h1>
-        <Link href={`/community?c=${ch.id}`} target="_blank" rel="noopener" className="btn-secondary !px-4 !py-2 text-sm">
-          コミュニティで開く ↗
-        </Link>
+        {ch.is_hidden ? (
+          <span className="chip-mute">非表示（コミュニティには表示されません）</span>
+        ) : (
+          <Link href={`/community?c=${ch.id}`} target="_blank" rel="noopener" className="btn-secondary !px-4 !py-2 text-sm">
+            コミュニティで開く ↗
+          </Link>
+        )}
       </div>
       <CommunityTabs />
       {searchParams.created === "1" && (
         <p className="rounded bg-green-50 border border-green-200 text-green-800 px-4 py-2 text-sm">
           チャンネルを作成しました。
-          {ch.visibility === "private" && "下の「メンバー」欄から参加者を追加してください。"}
+          {ch.visibility === "private" && "下の「メンバーの追加・削除」欄から参加者を追加してください。"}
         </p>
       )}
+      <ChannelImage channelId={ch.id} initialIcon={(ch.icon as string | null) ?? null} archived={!!ch.is_archived} />
       <ChannelForm channelId={ch.id} initial={initial} horses={(horses ?? []) as any[]} />
-      {ch.visibility === "private" && <ChannelMembers channelId={ch.id} />}
+      <ChannelMembers channelId={ch.id} visibility={ch.visibility === "private" ? "private" : "public"} />
     </div>
   );
 }

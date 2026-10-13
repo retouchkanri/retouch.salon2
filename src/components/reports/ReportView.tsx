@@ -4,6 +4,7 @@ import { formatYen } from "@/lib/format";
 import {
   BOARDING_PER_HORSE_YEN,
   EXPENSE_FIELDS,
+  SUPPORT_UNIT_YEN,
   SYSTEM_START_YM,
   TREND_ROWS,
   changeRate,
@@ -15,12 +16,22 @@ import {
   type MonthReport,
 } from "@/lib/monthlyReport";
 
-/** 一口支援の月額・支援者数・口数が、何を数えたものかを添える。 */
+/** 支援合計額が、何を数えたものかを添える。 */
 const SUPPORT_BASIS_HINT = {
   billed: "・この月に決済された定期課金",
   live: "・いま有効な定期課金",
   registered: "",
 } as const;
+
+/** マイナスの金額は「-¥6,000」の形で出す。 */
+function formatSignedYen(value: number): string {
+  return value < 0 ? `-${formatYen(-value)}` : formatYen(value);
+}
+
+/** 割り算の結果を、銭の位まで出す（例: ¥59,217.39）。 */
+function formatYenExact(value: number): string {
+  return `¥${value.toLocaleString("ja-JP", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 /** 手入力の調整がある項目に、システム計算からどう変わったかを 1 行で添える。 */
 function AdjustNote({ baseLabel, base, fee, extraLabel, extra }: { baseLabel: string; base: number; fee: number; extraLabel: string; extra: number }) {
@@ -70,16 +81,34 @@ export default function ReportView({
   expenses,
   note,
   trendAction,
+  supportHint,
 }: {
   report: MonthReport;
   expenses: ExpenseMap;
   note: string;
   /** 推移の表の見出しの横に置く操作（管理画面の「過去分をダウンロード」）。会員向けの表示では渡さない。 */
   trendAction?: ReactNode;
+  /** 継続支援者の口数に添える内訳（管理画面だけ。Stripe で支払い中の口数と、それ以外）。会員向けの表示では渡さない。 */
+  supportHint?: string;
 }) {
   const spent = expenseTotal(expenses);
   const { adjust, system } = report;
   const shareAdjusted = adjust.shareFeeYen !== 0 || adjust.shareExtraYen !== 0;
+  const { extraIncome } = report;
+  // 収入の合計に入っている項目の名前。手入力の 3 項目は、金額があるときだけ並べる。
+  const incomeItems = [
+    "単発寄付",
+    "会員寄付（会費）",
+    "支援寄付（一口）",
+    ...(extraIncome.youtubeYen !== 0 ? ["YouTube寄付支援"] : []),
+    ...(extraIncome.transferYen !== 0 ? ["馬の譲渡収入"] : []),
+    ...(extraIncome.otherYen !== 0 ? ["その他"] : []),
+  ].join("、");
+  // 当月の支援合計額は「支援口数 × 1口の金額」なので、その式を添える。終わった月は Stripe が課金した額。
+  const supportTotalHint =
+    report.supportBasis === "registered"
+      ? `${report.counts.shareUnits.toLocaleString("ja-JP")}口 × ${formatYen(SUPPORT_UNIT_YEN)}`
+      : `平均 ${formatYen(report.averageSupportYen)}${SUPPORT_BASIS_HINT[report.supportBasis]}`;
   const boardingHint =
     report.soldHorses > 0
       ? `${report.rescuedHorses}頭 − 売却・譲渡${report.soldHorses}頭 ＝ ${report.boardingHorses}頭 × ${formatYen(BOARDING_PER_HORSE_YEN)}`
@@ -89,11 +118,13 @@ export default function ReportView({
     <div className="report-sheet space-y-6">
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="会員数" value={`${report.counts.total.toLocaleString("ja-JP")}名`} hint={`新規 ${report.newMembers} / 退会 ${report.withdrawn}`} />
-        <Stat label="継続支援者" value={`${report.counts.shareSupporters.toLocaleString("ja-JP")}名`} hint={`${report.counts.shareUnits.toLocaleString("ja-JP")}口`} />
-        <Stat label="一口支援の月額" value={formatYen(report.counts.supportYen)} hint={`平均 ${formatYen(report.averageSupportYen)}${SUPPORT_BASIS_HINT[report.supportBasis]}`} />
-        <Stat label="今月の単発寄付" value={formatYen(report.donations.total)} hint={`カード ${formatYen(report.donations.card)} / 振込 ${formatYen(report.donations.bank)}`} />
-        <Stat label="会費収入" value={formatYen(report.duesYen)} hint={report.teamIncomeYen > 0 ? `うちリタポ・特別チーム ${formatYen(report.teamIncomeYen)}` : undefined} />
-        <Stat label="一口支援の入金" value={formatYen(report.shareIncomeYen)} hint={shareAdjusted ? "決済手数料・銀行振込を反映" : undefined} />
+        <Stat label="継続支援者" value={`${report.counts.shareSupporters.toLocaleString("ja-JP")}名`} hint={`${report.counts.shareUnits.toLocaleString("ja-JP")}口${supportHint ? `（${supportHint}）` : ""}`} />
+        <Stat label="支援合計額" value={formatYen(report.counts.supportYen)} hint={supportTotalHint} />
+        <Stat label="管理馬" value={report.managedHorses > 0 ? `${report.managedHorses.toLocaleString("ja-JP")}頭` : "—"} hint="支援を募集している在籍馬" />
+        <Stat label="1頭あたりの支援額" value={report.managedHorses > 0 ? formatYenExact(report.supportPerHorseYen) : "—"} hint="支援合計額 ÷ 管理馬" />
+        <Stat label="単発寄付" value={formatYen(report.donations.total)} hint={`カード ${formatYen(report.donations.card)} / 振込 ${formatYen(report.donations.bank)}`} />
+        <Stat label="会員寄付（会費）" value={formatYen(report.duesYen)} hint={report.teamIncomeYen > 0 ? `うちリタポ・特別チーム ${formatYen(report.teamIncomeYen)}` : undefined} />
+        <Stat label="支援寄付（一口）" value={formatYen(report.shareIncomeYen)} hint={shareAdjusted ? "決済手数料・銀行振込を反映" : undefined} />
         <Stat label="イベント申込" value={`${report.eventBookings.toLocaleString("ja-JP")}件`} hint="取消を除く申込" />
         <Stat label="保護馬の預託" value={formatYen(report.boardingYen)} hint={boardingHint} />
       </section>
@@ -173,7 +204,7 @@ export default function ReportView({
       <section className="card">
         <h2 className="section-title">{report.label}の収支</h2>
         <p className="text-sm text-ink-soft">
-          単発寄付、会費、一口支援の入金合計 {formatYen(report.incomeYen)} のうち、20%の {formatYen(report.operatingYen)} をRetouchの運営経費、80%の {formatYen(report.careYen)} を馬の保護・管理費に充てています。
+          {incomeItems}の合計 {formatYen(report.incomeYen)} のうち、20%の {formatYen(report.operatingYen)} をRetouchの運営経費、80%の {formatYen(report.careYen)} を馬の保護・管理費に充てています。
         </p>
         <div className="mt-4 grid sm:grid-cols-3 gap-3 text-sm">
           <div className="rounded-lg bg-surface-soft p-3">
@@ -183,28 +214,41 @@ export default function ReportView({
             <AdjustNote baseLabel="申告のあった寄付" base={system.donationCard + system.donationBank} fee={adjust.donationFeeYen} extraLabel="直接振込" extra={adjust.donationExtraYen} />
           </div>
           <div className="rounded-lg bg-surface-soft p-3">
-            <p className="text-ink-soft">会費収入</p>
+            <p className="text-ink-soft">会員寄付（会費）</p>
             <p className="font-bold">{formatYen(report.duesYen)}</p>
             {report.teamIncomeYen > 0 ? <p className="text-xs text-ink-mute">メンバーズ・サポーター・リェリーフ {formatYen(system.duesYen - report.teamIncomeYen)} / リタポ・特別チーム {formatYen(report.teamIncomeYen)}</p> : null}
             <AdjustNote baseLabel="カード決済" base={system.duesYen} fee={adjust.duesFeeYen} extraLabel="銀行振込など" extra={adjust.duesExtraYen} />
           </div>
           <div className="rounded-lg bg-surface-soft p-3">
-            <p className="text-ink-soft">一口支援</p>
+            <p className="text-ink-soft">支援寄付（一口）</p>
             <p className="font-bold">{formatYen(report.shareIncomeYen)}</p>
             <AdjustNote baseLabel="カード決済" base={system.shareIncomeYen} fee={adjust.shareFeeYen} extraLabel="銀行振込・引落" extra={adjust.shareExtraYen} />
           </div>
-          {report.otherIncomeYen !== 0 ? (
-            report.otherIncomeYen > 0 ? (
-              <div className="rounded-lg bg-surface-soft p-3"><p className="text-ink-soft">その他の定期入金</p><p className="font-bold">{formatYen(report.otherIncomeYen)}</p><p className="text-xs text-ink-mute">会費・一口支援のどちらにも分けられなかった入金</p></div>
-            ) : (
-              <div className="rounded-lg bg-surface-soft p-3"><p className="text-ink-soft">その他の返金</p><p className="font-bold">-{formatYen(-report.otherIncomeYen)}</p><p className="text-xs text-ink-mute">以前の月の決済を、この月に返金した分</p></div>
-            )
+          {extraIncome.youtubeYen !== 0 ? (
+            <div className="rounded-lg bg-surface-soft p-3">
+              <p className="text-ink-soft">YouTube寄付支援</p>
+              <p className="font-bold">{formatSignedYen(extraIncome.youtubeYen)}</p>
+            </div>
+          ) : null}
+          {extraIncome.transferYen !== 0 ? (
+            <div className="rounded-lg bg-surface-soft p-3">
+              <p className="text-ink-soft">馬の譲渡収入</p>
+              <p className="font-bold">{formatSignedYen(extraIncome.transferYen)}</p>
+            </div>
+          ) : null}
+          {extraIncome.otherYen !== 0 || report.otherIncomeYen !== 0 ? (
+            <div className="rounded-lg bg-surface-soft p-3">
+              <p className="text-ink-soft">その他</p>
+              <p className="font-bold">{formatSignedYen(extraIncome.otherYen)}</p>
+              {report.otherIncomeYen > 0 ? <p className="text-xs text-ink-mute">うち {formatYen(report.otherIncomeYen)} は、会費・一口支援のどちらにも分けられなかった定期入金</p> : null}
+              {report.otherIncomeYen < 0 ? <p className="text-xs text-ink-mute">うち -{formatYen(-report.otherIncomeYen)} は、以前の月の決済をこの月に返金した分</p> : null}
+            </div>
           ) : null}
         </div>
         <p className="mt-2 text-xs text-ink-mute">
           {hasIncomeAdjustments(adjust)
             ? "決済手数料を引いた項目と、銀行振込・引落の分を足した項目は、その内訳を金額の下に示しています。カードの決済は決済された月に数え、返金は返金した月の金額から引いています。"
-            : "会費・一口支援・カードの寄付は、その月にカードで決済された金額です（決済手数料を引く前）。返金は、返金した月の金額から引いています。"}
+            : "会員寄付（会費）・支援寄付（一口）・カードの単発寄付は、その月にカードで決済された金額です（決済手数料を引く前）。返金は、返金した月の金額から引いています。"}
         </p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">

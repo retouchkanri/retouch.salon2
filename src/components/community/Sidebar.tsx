@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
+  dmTitle,
   effectiveNotify,
   formatDayLabel,
   formatTime,
@@ -249,14 +250,17 @@ function BrandHeader() {
       </button>
       {menu && (
         <Menu onClose={() => setMenu(false)} className="absolute left-3 top-14">
-          <MenuItem
-            onClick={() => {
-              setMenu(false);
-              openModal({ type: "create" });
-            }}
-          >
-            チャンネルを作成する
-          </MenuItem>
+          {/* チャンネルを作成できるのは運営のみ */}
+          {me.isStaff && (
+            <MenuItem
+              onClick={() => {
+                setMenu(false);
+                openModal({ type: "create" });
+              }}
+            >
+              チャンネルを作成する
+            </MenuItem>
+          )}
           <MenuItem
             onClick={() => {
               setMenu(false);
@@ -357,51 +361,69 @@ function ViewTabs() {
 const ChannelItem = memo(function ChannelItem({ id }: { id: string }) {
   const ch = useChannel(id);
   const active = useCS((s) => s.currentId === id);
-  const meId = useCS((s) => s.me.id);
+  const me = useMe();
+  const meId = me.id;
   const dmName = useName(ch?.kind === "dm" ? ch.dm_user_id : null);
   const actions = useActions();
+  const openModal = useOpenModal();
   if (!ch) return null;
   const muted = effectiveNotify(ch) === "none";
   const unread = ch.unread_count > 0 && !muted;
   const count = unreadOf(ch);
   const isDm = ch.kind === "dm";
-  const label = isDm ? (ch.dm_user_id === meId ? `${dmName}（自分）` : dmName) : ch.name;
+  const canManageDm = isDm && me.isStaff;
+  const label = isDm ? dmTitle(ch, dmName, ch.dm_user_id === meId) : ch.name;
 
   return (
     <li>
-      <button
-        type="button"
-        onClick={() => actions.openChannel(ch.id)}
-        onMouseEnter={() => actions.prefetch(ch.id)}
-        onFocus={() => actions.prefetch(ch.id)}
-        aria-current={active ? "page" : undefined}
-        className={`group relative mx-3 flex h-8 w-[calc(100%-24px)] items-center gap-2 rounded-[10px] pl-3 pr-2 text-left text-[14px] transition-all duration-150 ${
+      <div
+        className={`group relative mx-3 flex h-8 w-[calc(100%-24px)] items-center rounded-[10px] transition-all duration-150 ${
           active
             ? "bg-white font-bold text-[#2D6A4F] shadow-[0_1px_3px_rgba(30,43,36,0.10)]"
             : unread
-              ? "font-bold text-sk-text hover:bg-white/80 hover:pl-3.5"
+              ? "font-bold text-sk-text hover:bg-white/80"
               : muted
-                ? "text-[#1E2B2466] hover:bg-white/80 hover:pl-3.5"
-                : "text-[#3F4E45] hover:bg-white/80 hover:pl-3.5"
+                ? "text-[#1E2B2466] hover:bg-white/80"
+                : "text-[#3F4E45] hover:bg-white/80"
         }`}
       >
         {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#2D6A4F]" aria-hidden />}
-        {isDm ? (
-          <Avatar userId={ch.dm_user_id} size={20} showOnline ring="side" />
-        ) : (
-          <span className={`flex w-5 justify-center ${active ? "text-[#2D6A4F]" : "text-[#8A968F]"}`}>
-            <ChannelGlyph ch={ch} />
-          </span>
+        <button
+          type="button"
+          onClick={() => actions.openChannel(ch.id)}
+          onMouseEnter={() => actions.prefetch(ch.id)}
+          onFocus={() => actions.prefetch(ch.id)}
+          aria-current={active ? "page" : undefined}
+          className="flex min-w-0 flex-1 items-center gap-2 truncate rounded-[10px] py-0 pl-3 pr-1 text-left text-[14px]"
+        >
+          {isDm ? (
+            <Avatar userId={ch.dm_user_id} size={20} showOnline ring="side" />
+          ) : (
+            <span className={`flex w-5 justify-center ${active ? "text-[#2D6A4F]" : "text-[#8A968F]"}`}>
+              <ChannelGlyph ch={ch} />
+            </span>
+          )}
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {count > 0 ? (
+            <Badge n={count} />
+          ) : unread ? (
+            <span className="h-2 w-2 rounded-full bg-[#E0782F]" aria-label="未読あり" />
+          ) : muted ? (
+            <Icon name="bellOff" className="w-3.5 h-3.5 opacity-60" />
+          ) : null}
+        </button>
+        {canManageDm && (
+          <button
+            type="button"
+            aria-label={`${label} の設定`}
+            title="名前の変更・削除"
+            onClick={() => openModal({ type: "dm", channelId: ch.id })}
+            className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] text-[#8A968F] opacity-70 hover:bg-[#E8F0EB] hover:text-[#2D6A4F] hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2D6A4F]/40 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+          >
+            <Icon name="more" className="w-3.5 h-3.5" />
+          </button>
         )}
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        {count > 0 ? (
-          <Badge n={count} />
-        ) : unread ? (
-          <span className="h-2 w-2 rounded-full bg-[#E0782F]" aria-label="未読あり" />
-        ) : muted ? (
-          <Icon name="bellOff" className="w-3.5 h-3.5 opacity-60" />
-        ) : null}
-      </button>
+      </div>
     </li>
   );
 });
@@ -463,6 +485,7 @@ function Section({
 
 function HomePanel() {
   const openModal = useOpenModal();
+  const me = useMe();
   const joined = useCS(
     (s) => s.channels.filter((c) => c.joined),
     shallowArray,
@@ -499,15 +522,19 @@ function HomePanel() {
           ))}
         </Section>
       )}
+      {/* 会員は、チャンネルの作成はできない（参加中のチャンネルの一覧だけを開ける） */}
       <Section
         id="channels"
         title="チャンネル"
-        addLabel="チャンネルを追加する"
+        addLabel={me.isStaff ? "チャンネルを追加する" : "チャンネル一覧を見る"}
+        onAdd={me.isStaff ? undefined : () => openModal({ type: "browse" })}
         addMenu={
-          <>
-            <MenuItem onClick={() => openModal({ type: "create" })}>新しいチャンネルを作成する</MenuItem>
-            <MenuItem onClick={() => openModal({ type: "browse" })}>チャンネル一覧を見る</MenuItem>
-          </>
+          me.isStaff ? (
+            <>
+              <MenuItem onClick={() => openModal({ type: "create" })}>新しいチャンネルを作成する</MenuItem>
+              <MenuItem onClick={() => openModal({ type: "browse" })}>チャンネル一覧を見る</MenuItem>
+            </>
+          ) : undefined
         }
       >
         {chans.map((c) => (
@@ -530,47 +557,65 @@ function HomePanel() {
 const DmRow = memo(function DmRow({ id }: { id: string }) {
   const ch = useChannel(id);
   const active = useCS((s) => s.currentId === id);
-  const meId = useCS((s) => s.me.id);
+  const me = useMe();
+  const meId = me.id;
   const name = useName(ch?.dm_user_id);
   const nameOf = useNameOf();
   const actions = useActions();
+  const openModal = useOpenModal();
   if (!ch) return null;
   const count = unreadOf(ch);
   const self = ch.dm_user_id === meId;
+  const title = dmTitle(ch, name, self);
   const at = ch.last_message_at ?? ch.created_at;
   const preview = ch.last_message_preview
     ? `${ch.last_message_user_id === meId ? "あなた: " : ""}${plainText(ch.last_message_preview, nameOf, 80)}`
     : "メッセージはまだありません";
   return (
     <li>
-      <button
-        type="button"
-        onClick={() => actions.openChannel(ch.id)}
-        onMouseEnter={() => actions.prefetch(ch.id)}
-        className={`mx-3 flex w-[calc(100%-24px)] items-start gap-3 rounded-[14px] px-3 py-2.5 text-left transition-all duration-150 ${
+      <div
+        className={`group mx-3 flex w-[calc(100%-24px)] items-start gap-1 rounded-[14px] transition-all duration-150 ${
           active ? "bg-white shadow-[0_1px_3px_rgba(30,43,36,0.10)]" : "hover:bg-white/80"
         }`}
       >
-        <Avatar userId={ch.dm_user_id} size={38} showOnline ring="side" />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-baseline gap-2">
-            <span
-              className={`min-w-0 flex-1 truncate text-[14px] ${
-                count > 0 ? "font-bold text-sk-text" : active ? "font-bold text-[#2D6A4F]" : "font-bold text-[#3F4E45]"
-              }`}
-            >
-              {self ? `${name}（自分）` : name}
+        <button
+          type="button"
+          onClick={() => actions.openChannel(ch.id)}
+          onMouseEnter={() => actions.prefetch(ch.id)}
+          className="flex min-w-0 flex-1 items-start gap-3 px-3 py-2.5 text-left"
+        >
+          <Avatar userId={ch.dm_user_id} size={38} showOnline ring="side" />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline gap-2">
+              <span
+                className={`min-w-0 flex-1 truncate text-[14px] ${
+                  count > 0 ? "font-bold text-sk-text" : active ? "font-bold text-[#2D6A4F]" : "font-bold text-[#3F4E45]"
+                }`}
+              >
+                {title}
+              </span>
+              <span className="shrink-0 text-[11px] text-sk-mute">
+                {formatDayLabel(at) === "今日" ? formatTime(at) : formatDayLabel(at)}
+              </span>
             </span>
-            <span className="shrink-0 text-[11px] text-sk-mute">
-              {formatDayLabel(at) === "今日" ? formatTime(at) : formatDayLabel(at)}
+            <span className="mt-0.5 flex items-center gap-2">
+              <span className={`min-w-0 flex-1 truncate text-[12px] ${count > 0 ? "text-sk-text" : "text-sk-mute"}`}>{preview}</span>
+              <Badge n={count} />
             </span>
           </span>
-          <span className="mt-0.5 flex items-center gap-2">
-            <span className={`min-w-0 flex-1 truncate text-[12px] ${count > 0 ? "text-sk-text" : "text-sk-mute"}`}>{preview}</span>
-            <Badge n={count} />
-          </span>
-        </span>
-      </button>
+        </button>
+        {me.isStaff && (
+          <button
+            type="button"
+            aria-label={`${title} の設定`}
+            title="名前の変更・削除"
+            onClick={() => openModal({ type: "dm", channelId: ch.id })}
+            className="mr-2 mt-2.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-[#8A968F] hover:bg-[#E8F0EB] hover:text-[#2D6A4F] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2D6A4F]/40"
+          >
+            <Icon name="more" className="w-4 h-4" />
+          </button>
+        )}
+      </div>
     </li>
   );
 });
@@ -582,7 +627,7 @@ function DmPanel() {
   const list = useMemo(() => {
     const sorted = sortDms(dms);
     const t = q.trim();
-    return t ? sorted.filter((c) => nameOf(c.dm_user_id).includes(t)) : sorted;
+    return t ? sorted.filter((c) => nameOf(c.dm_user_id).includes(t) || (c.label ?? "").includes(t)) : sorted;
   }, [dms, q, nameOf]);
   return (
     <>
@@ -714,6 +759,9 @@ function ActivityPanel() {
 
 function CreateChannelButton() {
   const openModal = useOpenModal();
+  const me = useMe();
+  // チャンネルを作成できるのは運営のみ
+  if (!me.isStaff) return null;
   return (
     <div className="hidden md:block shrink-0 border-t border-[#E2E9E4] p-3">
       <button

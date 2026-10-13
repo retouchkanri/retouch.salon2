@@ -300,7 +300,7 @@ export default async function AdminDashboardPage() {
           { href: "/admin/contracts", label: "契約一覧", sub: "A/B/C・停止処理", icon: "https://api.iconify.design/fluent-emoji-flat/page-with-curl.svg" },
           { href: "/admin/payments", label: "決済履歴", sub: "成功・失敗・返金", icon: "https://api.iconify.design/fluent-emoji-flat/credit-card.svg" },
           { href: "/admin/reports", label: "経営管理", sub: "会員推移・月次収支", icon: "https://api.iconify.design/fluent-emoji-flat/calendar.svg" },
-          { href: "/admin/giving", label: "寄付状況", sub: "何が増減したか", icon: "https://api.iconify.design/fluent-emoji-flat/sparkles.svg" },
+          { href: "/admin/giving", label: "支援状況", sub: "何が増減したか", icon: "https://api.iconify.design/fluent-emoji-flat/sparkles.svg" },
           { href: "/admin/follow-ups", label: "要フォロー", sub: "決済失敗・退会の兆候", icon: "https://api.iconify.design/fluent-emoji-flat/bell.svg" },
         ].map((l) => (
           <Link key={l.href} href={l.href} className="card !p-2.5 hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2.5 group">

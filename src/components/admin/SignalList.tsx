@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type Ref } from "react";
 import { formatDate, formatUnits, formatYen } from "@/lib/format";
+import type { CustomerNames } from "@/lib/customerNames";
 import type { BrightSpot, OpsSignal } from "@/lib/donationInsight";
+import MoverList from "./MoverList";
 
 const TONE = {
   alert: {
@@ -29,7 +31,7 @@ const TONE = {
   },
 } as const;
 
-function SignalRows({ signals, rowClass }: { signals: OpsSignal[]; rowClass: string }) {
+function SignalRows({ signals, rowClass, names }: { signals: OpsSignal[]; rowClass: string; names: CustomerNames }) {
   return (
     <ul className="space-y-1.5">
       {signals.map((signal) => (
@@ -48,6 +50,10 @@ function SignalRows({ signals, rowClass }: { signals: OpsSignal[]; rowClass: str
               </div>
             ) : null}
           </Link>
+          {/* 誰の支援か。名前から顧客情報を開けるよう、上のリンクの外に置く。 */}
+          {signal.people && signal.people.length > 0 ? (
+            <MoverList movers={signal.people} names={names} mode={signal.peopleMode ?? "delta"} showHorse className="px-2.5 pb-2 pt-0.5" />
+          ) : null}
         </li>
       ))}
     </ul>
@@ -84,7 +90,7 @@ function CardFrame({
   );
 }
 
-function BrightBody({ bright, extras }: { bright: BrightSpot; extras: OpsSignal[] }) {
+function BrightBody({ bright, extras, names }: { bright: BrightSpot; extras: OpsSignal[]; names: CustomerNames }) {
   const tone = TONE.bright;
   return (
     <div>
@@ -108,6 +114,7 @@ function BrightBody({ bright, extras }: { bright: BrightSpot; extras: OpsSignal[
                     +{formatUnits(horse.deltaUnits)}
                   </span>
                 </Link>
+                <MoverList movers={horse.people} names={names} className="px-2.5 pb-1.5 pt-0.5" />
               </li>
             ))}
           </ul>
@@ -117,14 +124,23 @@ function BrightBody({ bright, extras }: { bright: BrightSpot; extras: OpsSignal[
       </div>
       {extras.length > 0 ? (
         <div className="mt-3">
-          <SignalRows signals={extras} rowClass={tone.row} />
+          <SignalRows signals={extras} rowClass={tone.row} names={names} />
         </div>
       ) : null}
     </div>
   );
 }
 
-export default function SignalList({ signals, bright }: { signals: OpsSignal[]; bright: BrightSpot }) {
+export default function SignalList({
+  signals,
+  bright,
+  names = {},
+}: {
+  signals: OpsSignal[];
+  bright: BrightSpot;
+  /** 口数が動いた人の名前（顧客 ID → 氏名・ニックネーム）。 */
+  names?: CustomerNames;
+}) {
   const alerts = signals.filter((signal) => signal.level === "alert");
   const watches = signals.filter((signal) => signal.level === "watch");
   const goods = signals.filter((signal) => signal.level === "good");
@@ -146,20 +162,20 @@ export default function SignalList({ signals, bright }: { signals: OpsSignal[]; 
       <div className="grid items-start gap-3 lg:grid-cols-3">
         <CardFrame toneKey="alert" cardRef={firstRef}>
           {alerts.length > 0 ? (
-            <SignalRows signals={alerts} rowClass={TONE.alert.row} />
+            <SignalRows signals={alerts} rowClass={TONE.alert.row} names={names} />
           ) : (
             <p className="px-1 text-sm text-black/55">急いで見る項目はありません。</p>
           )}
         </CardFrame>
         <CardFrame toneKey="watch" height={cardHeight}>
           {watches.length > 0 ? (
-            <SignalRows signals={watches} rowClass={TONE.watch.row} />
+            <SignalRows signals={watches} rowClass={TONE.watch.row} names={names} />
           ) : (
             <p className="px-1 text-sm text-black/55">気にしておく動きはありません。</p>
           )}
         </CardFrame>
         <CardFrame toneKey="bright" height={cardHeight}>
-          <BrightBody bright={bright} extras={goods} />
+          <BrightBody bright={bright} extras={goods} names={names} />
         </CardFrame>
       </div>
       <p className="mt-2 px-1 text-[11px] text-black/45">

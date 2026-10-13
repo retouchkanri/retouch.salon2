@@ -15,6 +15,9 @@ import {
 } from "@/lib/community/constants";
 import {
   CHANNEL_NAME_LIMIT,
+  canAddMembers,
+  canJoinChannel,
+  canRemoveMembers,
   channelNameProblem,
   effectiveNotify,
   formatDateTime,
@@ -279,7 +282,7 @@ function PeoplePicker({
       try {
         const list = await api.inviteCandidates(actions.db, channelId, q);
         if (id !== seq.current) return;
-        actions.mergeUsers(list);
+        actions.mergeUsers(list.filter((u) => u.display_name));
         setRows(list);
       } catch {
         if (id === seq.current) setRows([]);
@@ -299,8 +302,8 @@ function PeoplePicker({
         {selected.map((u) => (
           <span key={u.user_id} className="flex h-7 items-center gap-1 rounded-[8px] bg-[#2D8A621A] pl-0.5 pr-1 text-[13px] font-bold text-sk-link">
             <Avatar userId={u.user_id} size={22} />
-            {u.display_name ?? "会員"}
-            <button type="button" onClick={() => toggle(u)} aria-label={`${u.display_name} を外す`} className="rounded-[3px] hover:bg-[#2D8A6233]">
+            {u.display_name || u.real_name || "会員"}
+            <button type="button" onClick={() => toggle(u)} aria-label={`${u.display_name || u.real_name || "会員"} を外す`} className="rounded-[3px] hover:bg-[#2D8A6233]">
               <Icon name="close" className="w-3.5 h-3.5" strokeWidth={2.5} />
             </button>
           </span>
@@ -308,7 +311,7 @@ function PeoplePicker({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={selected.length ? "" : me.isStaff ? "表示名・氏名で検索" : "表示名で検索"}
+          placeholder={selected.length ? "" : me.isStaff ? "表示名・氏名・フリガナで検索" : "表示名で検索"}
           className="h-7 min-w-[140px] flex-1 bg-transparent px-1.5 text-[15px] outline-none placeholder:text-[#1E2B2480]"
           autoFocus
         />
@@ -328,10 +331,12 @@ function PeoplePicker({
                 <Avatar userId={u.user_id} size={28} showOnline />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
-                    <span className="truncate text-[15px] font-bold">{u.display_name}</span>
+                    <span className="truncate text-[15px] font-bold">{u.display_name || u.real_name || "会員"}</span>
                     {u.is_staff && <StaffTag />}
                   </span>
-                  {me.isStaff && u.real_name && <span className="block truncate text-[12px] text-sk-mute">氏名: {u.real_name}</span>}
+                  {me.isStaff && u.real_name && u.display_name && u.real_name !== u.display_name && (
+                    <span className="block truncate text-[12px] text-sk-mute">氏名: {u.real_name}</span>
+                  )}
                 </span>
                 <span className={`flex h-5 w-5 items-center justify-center rounded-[8px] border ${on ? "border-sk-green bg-sk-green text-white" : "border-[#1E2B244D]"}`}>
                   {on && <Icon name="check" className="w-3.5 h-3.5" strokeWidth={3} />}
@@ -591,6 +596,85 @@ function InviteModal({ channelId, onClose }: { channelId: string; onClose: () =>
       }
     >
       <PeoplePicker channelId={channelId} selected={selected} onChange={setSelected} />
+      <p className="mt-3 text-[13px] text-sk-mute">
+        コミュニティを利用できる会員全員から選べます。このチャンネルの対象者に当てはまらない会員も、運営が追加した会員として参加します（会員種別が変わっても、運営が外すまで参加したままです）。
+      </p>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ダイレクトメッセージの設定（運営のみ: 名前の変更・削除）
+// ---------------------------------------------------------------------------
+
+function DmSettingsModal({ channelId, onClose }: { channelId: string; onClose: () => void }) {
+  const actions = useActions();
+  const me = useMe();
+  const ch = useChannel(channelId);
+  const peer = useName(ch?.dm_user_id);
+  const [label, setLabel] = useState(ch?.label ?? "");
+  const [busy, setBusy] = useState(false);
+  if (!ch || ch.kind !== "dm" || !me.isStaff) return null;
+  const changed = label.trim() !== (ch.label ?? "");
+  return (
+    <Modal
+      title="ダイレクトメッセージの設定"
+      onClose={onClose}
+      footer={
+        <PrimaryButton
+          disabled={busy || !changed}
+          onClick={async () => {
+            setBusy(true);
+            const ok = await actions.renameDm(channelId, label.trim());
+            setBusy(false);
+            if (ok) onClose();
+          }}
+        >
+          {busy ? "保存中…" : "名前を保存"}
+        </PrimaryButton>
+      }
+    >
+      <label className="block text-[13px] font-bold text-sk-text" htmlFor="dm-label">
+        表示する名前
+      </label>
+      <input
+        id="dm-label"
+        className={`${inputClass} mt-1`}
+        value={label}
+        maxLength={60}
+        placeholder={peer}
+        onChange={(e) => setLabel(e.target.value)}
+        autoFocus
+      />
+      <p className="mt-1.5 text-[13px] text-sk-mute">
+        一覧と見出しに、この名前で表示します。名前は自分にだけ表示され、相手（{peer} さん）には見えません。空欄にして保存すると、相手の表示名に戻ります。
+      </p>
+      <div className="mt-6 border-t border-sk-line pt-4">
+        <button
+          type="button"
+          disabled={busy}
+          className="flex w-full items-center gap-2 rounded-[12px] border border-sk-line px-4 py-3 text-left text-[15px] font-bold text-[#D2475E] hover:bg-sk-soft disabled:opacity-50"
+          onClick={async () => {
+            if (
+              !window.confirm(
+                `${peer} さんとのダイレクトメッセージを削除しますか？\nメッセージと添付ファイルが、相手側を含めてすべて削除され、元に戻せません。`,
+              )
+            ) {
+              return;
+            }
+            setBusy(true);
+            const ok = await actions.deleteDm(channelId);
+            setBusy(false);
+            if (ok) onClose();
+          }}
+        >
+          <Icon name="trash" className="w-4 h-4" />
+          このダイレクトメッセージを削除する
+        </button>
+        <p className="mt-1.5 text-[12px] text-sk-mute">
+          削除すると、相手の一覧からもこの会話が消えます。もう一度「新しいメッセージ」から開くと、空の会話として始まります。
+        </p>
+      </div>
     </Modal>
   );
 }
@@ -684,7 +768,7 @@ function DirectoryModal({ onClose }: { onClose: () => void }) {
 function BrowseRow({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
   const actions = useActions();
   const me = useMe();
-  const joinable = !ch.joined && !ch.is_archived && (ch.visibility === "public" || me.isStaff);
+  const joinable = canJoinChannel(ch, me.isStaff);
   return (
     <li className="group flex items-center gap-3 border-b border-sk-line px-1 py-3 last:border-b-0 hover:bg-sk-soft">
       <button
@@ -740,6 +824,7 @@ function BrowseRow({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
 function BrowseModal({ onClose }: { onClose: () => void }) {
   const channels = useCS((s) => s.channels);
   const openModal = useOpenModal();
+  const me = useMe();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "joined" | "notJoined" | "archived">("all");
   const list = useMemo(() => {
@@ -768,9 +853,11 @@ function BrowseModal({ onClose }: { onClose: () => void }) {
             autoFocus
           />
         </label>
-        <PrimaryButton className="!h-10" onClick={() => openModal({ type: "create" })}>
-          作成
-        </PrimaryButton>
+        {me.isStaff && (
+          <PrimaryButton className="!h-10" onClick={() => openModal({ type: "create" })}>
+            作成
+          </PrimaryButton>
+        )}
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(
@@ -906,6 +993,7 @@ function audienceText(ch: ChannelRow): string | null {
 
 function AboutTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
   const actions = useActions();
+  const me = useMe();
   const creator = useName(ch.created_by);
   const [editing, setEditing] = useState<"name" | "topic" | "description" | null>(null);
   const canEditInfo = !ch.is_archived && (ch.can_manage || (ch.joined && ch.post_policy === "everyone"));
@@ -1015,7 +1103,7 @@ function AboutTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
               チャンネルから退出する
             </button>
           )
-        : !ch.is_archived && (
+        : canJoinChannel(ch, me.isStaff) && (
             <PrimaryButton
               className="w-full"
               onClick={async () => {
@@ -1057,9 +1145,13 @@ function MemberRow({ userId, ch, canRemove }: { userId: string; ch: ChannelRow; 
       {canRemove && userId !== me.id && (
         <button
           type="button"
-          className="hidden text-[13px] font-bold text-sk-link hover:underline group-hover:block"
+          className="shrink-0 text-[13px] font-bold text-sk-link hover:underline md:hidden md:group-hover:block"
           onClick={async () => {
-            if (!window.confirm(`${name} さんを #${ch.name} から外しますか？`)) return;
+            const note =
+              ch.visibility === "private"
+                ? ""
+                : "\n外した会員は、運営が追加し直すまで、このチャンネルを閲覧できません。";
+            if (!window.confirm(`${name} さんを #${ch.name} から外しますか？${note}`)) return;
             await actions.removeMember(ch.id, userId);
           }}
         >
@@ -1084,8 +1176,9 @@ function MembersTab({ ch }: { ch: ChannelRow }) {
     const list = members?.ids ?? [];
     return t ? list.filter((id) => (users[id]?.display_name ?? users[id]?.real_name ?? "").includes(t)) : list;
   }, [members?.ids, users, q]);
-  const canAdd = !ch.is_archived && ch.joined && ch.audience === "all" && !(ch.visibility === "public" && ch.auto_join);
-  const canRemove = ch.can_manage && ch.visibility === "private";
+  const me = useMe();
+  const canAdd = canAddMembers(ch, me.isStaff);
+  const canRemove = canRemoveMembers(ch, me.isStaff);
   const hidden = (members?.total ?? ch.member_count) - (members?.ids.length ?? 0);
   return (
     <div>
@@ -1181,6 +1274,27 @@ function SettingsTab({ ch, onClose }: { ch: ChannelRow; onClose: () => void }) {
             <Icon name="settings" className="w-4 h-4" />
             管理画面で詳しく設定する（対象者・並び順など）
           </Link>
+        )}
+        {me.isStaff && (
+          <button
+            type="button"
+            onClick={async () => {
+              const typed = window.prompt(
+                `チャンネル「${ch.name}」を削除すると、メッセージと添付ファイルもすべて削除され、元に戻せません。\n残したい場合は「アーカイブ」を使ってください。\n\n削除する場合はチャンネル名を入力してください。`,
+              );
+              if (typed == null) return;
+              if (typed.trim() !== (ch.name ?? "").trim()) {
+                window.alert("チャンネル名が一致しません。削除を中止しました。");
+                return;
+              }
+              const ok = await actions.deleteChannel(ch.id);
+              if (ok) onClose();
+            }}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-[15px] text-[#D2475E] hover:bg-sk-soft"
+          >
+            <Icon name="trash" className="w-4 h-4" />
+            チャンネルを削除する
+          </button>
         )}
       </div>
     </div>
@@ -1607,6 +1721,8 @@ export default function ModalHost() {
       return <DetailsModal key={modal.channelId} channelId={modal.channelId} tab={modal.tab} onClose={closeModal} />;
     case "invite":
       return <InviteModal channelId={modal.channelId} onClose={closeModal} />;
+    case "dm":
+      return <DmSettingsModal key={modal.channelId} channelId={modal.channelId} onClose={closeModal} />;
     case "search":
       return <SearchModal channelId={modal.channelId} onClose={closeModal} />;
     case "pinned":

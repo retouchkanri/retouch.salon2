@@ -32,6 +32,8 @@ export type ChannelFormValue = {
   is_required: boolean;
   sort_order: number;
   is_archived: boolean;
+  /** コミュニティの画面で、運営を含めて誰にも表示しない */
+  is_hidden: boolean;
 };
 
 export const EMPTY_CHANNEL: ChannelFormValue = {
@@ -48,6 +50,7 @@ export const EMPTY_CHANNEL: ChannelFormValue = {
   is_required: false,
   sort_order: 100,
   is_archived: false,
+  is_hidden: false,
 };
 
 const PRESETS: { label: string; apply: Partial<ChannelFormValue> }[] = [
@@ -213,15 +216,15 @@ export default function ChannelForm({
 
       <section className="card space-y-4">
         <fieldset>
-          <legend className="label">公開範囲</legend>
+          <legend className="label">表示する相手</legend>
           <div className="flex flex-wrap gap-4 text-sm">
             <label className="flex items-center gap-2">
               <input type="radio" checked={v.visibility === "public"} onChange={() => set("visibility", "public")} />
-              公開（対象者なら誰でも閲覧・参加できる）
+              対象者に表示する（下の「対象者」に当てはまる会員だけに表示。当てはまらない会員には表示されません）
             </label>
             <label className="flex items-center gap-2">
               <input type="radio" checked={v.visibility === "private"} onChange={() => setV((p) => ({ ...p, visibility: "private", auto_join: false, is_required: false }))} />
-              非公開（招待したメンバーのみ）
+              非公開（運営が追加したメンバーだけに表示。会員種別などに応じた自動参加は行いません）
             </label>
           </div>
         </fieldset>
@@ -283,7 +286,7 @@ export default function ChannelForm({
           </fieldset>
         ) : (
           <p className="text-sm text-ink-soft rounded bg-surface-soft p-3">
-            非公開チャンネルは、保存後に表示される「メンバー」欄で会員を追加します。運営は常に閲覧できます。
+            非公開チャンネルは、保存後に表示される「メンバーの追加・削除」欄で会員を追加します。追加した会員だけに表示され、会員種別や支援に応じて自動で参加することはありません。運営は常に閲覧できます。
           </p>
         )}
 
@@ -312,7 +315,7 @@ export default function ChannelForm({
               />
               <span>
                 対象者全員のサイドバーに自動で表示する（自動参加）
-                <span className="block text-xs text-ink-mute">オフにすると、会員は「チャンネルを探す」から自分で参加します。</span>
+                <span className="block text-xs text-ink-mute">オフにすると、運営が「メンバーの追加・削除」で追加した会員だけが参加します（会員が自分で参加することはできません）。</span>
               </span>
             </label>
             <label className={`flex items-start gap-2 ${v.auto_join ? "" : "opacity-50"}`}>
@@ -342,6 +345,15 @@ export default function ChannelForm({
             </label>
           )}
         </div>
+        <label className={`flex items-start gap-2 rounded border p-3 text-sm ${v.is_hidden ? "border-amber-300 bg-amber-50" : "border-surface-line"}`}>
+          <input type="checkbox" className="mt-1" checked={v.is_hidden} onChange={(e) => set("is_hidden", e.target.checked)} />
+          <span>
+            <span className="font-semibold">非表示にする（コミュニティの画面で、誰にも表示しない）</span>
+            <span className="block text-xs text-ink-mute">
+              チェックを入れて保存すると、会員にも運営にも、コミュニティの一覧に表示されなくなります。メッセージやメンバーの記録は残り、チェックを外して保存すると元どおり表示されます。
+            </span>
+          </span>
+        </label>
       </section>
 
       {msg && <p className={`text-sm ${msg.ok ? "text-green-700" : "text-danger"}`}>{msg.text}</p>}

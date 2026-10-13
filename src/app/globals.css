@@ -340,26 +340,6 @@ body.hero-active .scroll-top-btn {
   animation: deckBorderSpin 3s linear infinite;
 }
 
-/* ── Emergency support horse thumbnail: pink frame + clockwise white highlight ── */
-.emergency-horse-border-spin {
-  animation: deckBorderSpin 2.5s linear infinite;
-}
-.emergency-horse-thumb {
-  position: relative;
-  overflow: hidden;
-  border-radius: 0.75rem;
-  padding: 2px;
-}
-.emergency-horse-thumb__inner {
-  position: relative;
-  z-index: 10;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border-radius: calc(0.75rem - 2px);
-  background: #fff;
-}
-
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -404,7 +384,7 @@ details[open] .faq-chevron { transform: rotate(180deg); }
 .faq-chevron { transition: transform 0.25s ease; }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-fade, .hero-zoom, .hero-pulse, .hero-scale-loop, .feature-float, .feature-card, .btn-pulse, .deck-border-spin, .emergency-horse-border-spin, .community-nav-attn,
+  .hero-fade, .hero-zoom, .hero-pulse, .hero-scale-loop, .feature-float, .feature-card, .btn-pulse, .deck-border-spin, .community-nav-attn,
   .community-progress-ring, .community-progress-dots span {
     animation: none !important;
     opacity: 1 !important;
@@ -433,7 +413,7 @@ details[open] .faq-chevron { transform: rotate(180deg); }
   }
   /* ループ系・登場系の装飾アニメをスマホでは停止（上の prefers-reduced-motion と同じ安全な解除）。 */
   .hero-fade, .hero-zoom, .hero-pulse, .hero-scale-loop,
-  .feature-float, .feature-card, .btn-pulse, .deck-border-spin, .emergency-horse-border-spin {
+  .feature-float, .feature-card, .btn-pulse, .deck-border-spin {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;

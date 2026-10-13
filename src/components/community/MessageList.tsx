@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { dayKey, formatDayLabel, isVisibleMessage, shouldGroup } from "@/lib/community/text";
+import { canAddMembers, dayKey, formatDayLabel, isVisibleMessage, shouldGroup } from "@/lib/community/text";
 import type { ChannelRow, Message } from "@/lib/community/types";
 import Avatar from "./Avatar";
 import { Icon } from "./icons";
@@ -45,7 +45,7 @@ function Intro({ ch }: { ch: ChannelRow }) {
       </div>
     );
   }
-  const canAddMembers = !ch.is_archived && ch.joined && !(ch.visibility === "public" && ch.auto_join) && ch.audience === "all";
+  const addMembers = canAddMembers(ch, me.isStaff);
   const canEdit = !ch.is_archived && (ch.can_manage || (ch.joined && ch.post_policy === "everyone"));
   return (
     <div className="px-5 pb-4 pt-10">
@@ -64,7 +64,7 @@ function Intro({ ch }: { ch: ChannelRow }) {
         これは <b className="text-sk-text">#{ch.name}</b> チャンネルの一番最初です。
         {ch.description && <> {ch.description}</>}
       </p>
-      {(canEdit || canAddMembers) && (
+      {(canEdit || addMembers) && (
         <div className="mt-3 flex flex-wrap gap-2">
           {canEdit && (
             <button
@@ -76,7 +76,7 @@ function Intro({ ch }: { ch: ChannelRow }) {
               {ch.description ? "説明を編集" : "説明を追加"}
             </button>
           )}
-          {canAddMembers && (
+          {addMembers && (
             <button
               type="button"
               onClick={() => openModal({ type: "invite", channelId: ch.id })}

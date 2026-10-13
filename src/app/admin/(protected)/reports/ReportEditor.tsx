@@ -7,6 +7,7 @@ import {
   ADJUST_ROWS,
   BOARDING_PER_HORSE_YEN,
   EXPENSE_FIELDS,
+  EXTRA_INCOME_ROWS,
   adjustIncome,
   parseAdjustments,
   type AdjustRowKey,
@@ -41,7 +42,8 @@ export default function ReportEditor({
   system: SystemIncome;
   /** Stripe が記録している、その月の決済手数料（区分ごと）。手数料の欄に入れる金額の目安。 */
   stripeFees: Record<AdjustRowKey, number>;
-  horseDefaults: { rescued: number; sold: number };
+  /** 馬マスタから自動で数えた頭数。added は、この月に加わり、翌月から預託に数える馬の頭数。 */
+  horseDefaults: { rescued: number; sold: number; added: number };
   note: string;
   publishedAt: string | null;
   tableMissing: boolean;
@@ -57,6 +59,9 @@ export default function ReportEditor({
     duesExtraYen: asText(adjust.duesExtraYen),
     shareFeeYen: asText(adjust.shareFeeYen),
     shareExtraYen: asText(adjust.shareExtraYen),
+    youtubeYen: asText(adjust.youtubeYen),
+    transferYen: asText(adjust.transferYen),
+    otherYen: asText(adjust.otherYen),
   });
   const [rescuedText, setRescuedText] = useState(horseCount == null ? "" : String(horseCount));
   const [soldText, setSoldText] = useState(adjust.soldHorses == null ? "" : String(adjust.soldHorses));
@@ -68,6 +73,10 @@ export default function ReportEditor({
   const boarding = rescued - sold;
   const systemOf = { donation: system.donationCard + system.donationBank, dues: system.duesYen, share: system.shareIncomeYen };
   const publishedOf = { donation: income.donations.total, dues: income.duesYen, share: income.shareIncomeYen };
+  // 手入力だけの項目。「その他」だけは、会費にも一口支援にも分けられなかった定期入金・返金（システム計算）がある。
+  const systemOtherYen = system.incomeYen - systemOf.donation - systemOf.dues - systemOf.share;
+  const extraSystemOf = { youtubeYen: 0, transferYen: 0, otherYen: systemOtherYen };
+  const extraPublishedOf = { youtubeYen: income.youtubeYen, transferYen: income.transferYen, otherYen: income.otherYen };
 
   async function submit(form: HTMLFormElement, publish: boolean) {
     const data = new FormData(form);
@@ -164,12 +173,31 @@ export default function ReportEditor({
                   <td className="py-2 text-right font-bold tabular-nums whitespace-nowrap">{formatYen(publishedOf[row.key])}</td>
                 </tr>
               ))}
+              {EXTRA_INCOME_ROWS.map((row) => (
+                <tr key={row.key} className="border-t border-black/5 align-top">
+                  <td className="py-2 pr-3 whitespace-nowrap font-medium">{row.label}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">{extraSystemOf[row.key] === 0 ? "—" : formatYen(extraSystemOf[row.key])}</td>
+                  <td className="py-2 pr-3 text-ink-mute">—</td>
+                  <td className="py-2 pr-3">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      aria-label={`${row.label}の金額`}
+                      value={yen[row.key]}
+                      onChange={(event) => setYen((prev) => ({ ...prev, [row.key]: event.target.value }))}
+                      className="w-32 rounded-lg border px-3 py-2 text-right"
+                    />
+                    <span className="mt-0.5 block text-xs text-ink-mute">{row.hint}</span>
+                  </td>
+                  <td className="py-2 text-right font-bold tabular-nums whitespace-nowrap">{formatYen(extraPublishedOf[row.key])}</td>
+                </tr>
+              ))}
               <tr className="border-t border-black/10 font-bold">
-                <td className="py-2 pr-3">3項目の合計</td>
-                <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">{formatYen(systemOf.donation + systemOf.dues + systemOf.share)}</td>
+                <td className="py-2 pr-3">合計</td>
+                <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">{formatYen(system.incomeYen)}</td>
                 <td className="py-2 pr-3 tabular-nums whitespace-nowrap">−{formatYen(live.donationFeeYen + live.duesFeeYen + live.shareFeeYen)}</td>
-                <td className="py-2 pr-3 tabular-nums whitespace-nowrap">{formatYen(live.donationExtraYen + live.duesExtraYen + live.shareExtraYen)}</td>
-                <td className="py-2 text-right tabular-nums whitespace-nowrap">{formatYen(publishedOf.donation + publishedOf.dues + publishedOf.share)}</td>
+                <td className="py-2 pr-3 tabular-nums whitespace-nowrap">{formatYen(live.donationExtraYen + live.duesExtraYen + live.shareExtraYen + live.youtubeYen + live.transferYen + live.otherYen)}</td>
+                <td className="py-2 text-right tabular-nums whitespace-nowrap">{formatYen(income.incomeYen)}</td>
               </tr>
             </tbody>
           </table>
@@ -177,6 +205,7 @@ export default function ReportEditor({
         <ul className="list-disc space-y-1 pl-5 text-xs text-ink-mute">
           <li>「カード決済手数料」には、カードで決済された金額と、実際に入金された金額の差を入れます。Stripe が記録している手数料は欄の下に出ます。「入れる」を押すと、その金額が入ります。</li>
           <li>「銀行振込・引落など」には、会員サイトの記録にない入金を入れます。数えすぎていた分を引くときは、マイナスで入れます。</li>
+          <li>「YouTube寄付支援」「馬の譲渡収入」「その他」は、会員サイトでは計算できない収入です。その月に受け取った金額を、右から2番目の欄に入れます。入れた金額は、収入の合計に入ります。</li>
           <li>ここで引いた決済手数料は、下の運営経費の「決済関連費」には入れないでください。同じ金額を二重に引くことになります。</li>
           <li>空欄は、調整なしです。</li>
         </ul>
@@ -185,12 +214,14 @@ export default function ReportEditor({
       <div className="space-y-3">
         <div>
           <h2 className="section-title">保護馬の預託</h2>
-          <p className="text-sm text-ink-soft">売却・譲渡した馬は預託から引きます。空欄のままなら、登録されている馬から自動で数えます。</p>
+          <p className="text-sm text-ink-soft">
+            空欄のままなら、馬マスタから自動で数えます。亡くなった馬（故）と、売却・譲渡した馬（オーナー決定）は預託から外れます。その月に加わった馬は、翌月から預託に数えます。
+          </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <label className="block text-sm">
             <span className="font-medium">保護した馬の頭数</span>
-            <span className="mt-0.5 block text-xs text-ink-mute">売却・譲渡した馬を含む。空欄なら、故と記載のない馬の数</span>
+            <span className="mt-0.5 block text-xs text-ink-mute">売却・譲渡した馬を含む。空欄なら、馬マスタから自動（前月までに登録した馬）</span>
             <input
               name="horseCount"
               type="number"
@@ -220,6 +251,9 @@ export default function ReportEditor({
         <p className="text-sm">
           預託中 <span className="font-bold tabular-nums">{rescued}頭 − {sold}頭 ＝ {boarding}頭</span> × {formatYen(BOARDING_PER_HORSE_YEN)} ＝ <span className="font-bold tabular-nums">{formatYen(boarding * BOARDING_PER_HORSE_YEN)}</span>
         </p>
+        {horseDefaults.added > 0 ? (
+          <p className="text-xs text-ink-mute">この月に加わった馬 {horseDefaults.added}頭は、翌月から預託に数えます（自動で数えるとき）。</p>
+        ) : null}
       </div>
 
       <div className="space-y-3">

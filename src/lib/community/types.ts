@@ -38,6 +38,8 @@ export type ChannelRow = {
   member_count: number;
   /** アイコン（画像のパス /uploads/... または絵文字1つ。null = # / 鍵のマーク）。 */
   icon?: string | null;
+  /** DM に自分で付けた名前（運営のみ付けられる。相手には見えない。null = 相手の表示名）。 */
+  label?: string | null;
 };
 
 export type Attachment = {
@@ -95,6 +97,8 @@ export type Bootstrap = {
   is_open?: boolean;
   is_active?: boolean;
   is_member?: boolean;
+  /** 会員種別のない会員（無料会員）。コミュニティは利用できない。 */
+  is_free?: boolean;
   ban?: { reason: string | null; until: string | null } | null;
   profile?: CommunityProfile | null;
 };

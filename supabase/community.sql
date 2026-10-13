@@ -16,8 +16,17 @@
 --     と「自分が参加している DM」だけを読める。運営も他人同士の DM は読めない。
 --   - 書き込みはすべて SECURITY DEFINER の関数（community_send など）経由のみ。
 --     テーブルへの直接の INSERT / UPDATE / DELETE は authenticated / anon に許可しない。
---   - Slack の1つのワークスペースと同じく、有効な会員はいつでも参加できる（管理画面での
---     「公開」操作は不要）。会員どうしでも公開／非公開チャンネルを作成できる。
+--   - コミュニティを利用できるのは、運営と有料会員（会員種別のある有効な会員）だけ（2026-10-13）。
+--     会員種別のない会員（無料会員）は、コミュニティを開けない（community__is_active_user）。
+--   - 会員が見るチャンネルは、運営が決める（2026-10-12）:
+--       ・「全会員」が対象の公開チャンネルは、コミュニティを利用できる会員全員。
+--       ・会員種別・支援馬ごとのチャンネルは、その会員種別・支援のある人が自動で参加する。
+--       ・非表示（community_channels.is_hidden）にしたチャンネルは、運営を含めて誰にも表示しない
+--         （メッセージは残る。管理画面で「非表示」を外すと元に戻る）。
+--       ・チャンネルの作成・削除、メンバーの追加・削除は運営のみ。運営は、どのチャンネルでも会員を手動で
+--         追加・削除でき、その指定は対象者の規則より優先する（community_channel_members.access）。
+--       ・会員が自分で参加できるのは、自動で参加するチャンネルか、運営に追加されたチャンネルに戻るとき
+--         （退出後の再参加）だけ。
 --   - 他の会員には本名を出さず、コミュニティ用の表示名だけを表示する（本名は運営のみ）。
 -- =====================================================================
 
@@ -99,6 +108,10 @@ create table if not exists public.community_channels (
 alter table public.community_channels add column if not exists icon text
   check (icon is null or char_length(icon) <= 300);
 
+-- 非表示（2026-10-13）: true のチャンネルは、コミュニティの画面で運営を含めて誰にも表示しない。
+-- メッセージやメンバーの記録は残り、管理画面で false に戻すと元どおり表示される。
+alter table public.community_channels add column if not exists is_hidden boolean not null default false;
+
 create unique index if not exists community_channels_name_uidx
   on public.community_channels (lower(name)) where kind = 'channel';
 create index if not exists community_channels_kind_idx
@@ -122,6 +135,22 @@ create table if not exists public.community_channel_members (
 
 create index if not exists community_channel_members_user_idx
   on public.community_channel_members (user_id);
+
+-- 運営が手動で決めた参加状態（2026-10-12）
+--   granted: 運営が追加した人。対象者（会員種別など）に当てはまらなくても、そのチャンネルのメンバーになる。
+--   removed: 運営が外した人。対象者に当てはまっていても、そのチャンネルを閲覧できず、自分では戻れない。
+--   null   : 手動の指定なし（対象者の規則どおり）。
+alter table public.community_channel_members
+  add column if not exists access text check (access is null or access in ('granted', 'removed'));
+
+-- DM の表示名（運営が自分用に付ける名前。付けた本人にだけ表示し、相手には見えない）
+create table if not exists public.community_dm_labels (
+  channel_id uuid not null references public.community_channels(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  label text not null check (char_length(btrim(label)) between 1 and 60),
+  updated_at timestamptz not null default now(),
+  primary key (channel_id, user_id)
+);
 
 -- ---------- メッセージ（スレッド返信を含む） ----------
 create table if not exists public.community_messages (
@@ -284,21 +313,27 @@ as $$
   limit 1;
 $$;
 
--- コミュニティを利用できるアカウントか（公開状態は問わない）
+-- コミュニティを利用できるアカウントか。運営、または利用停止中でない有料会員（会員種別のある有効な会員）。
+-- 会員種別のない会員（無料会員）は利用できない（2026-10-13）。
+-- （community__member_codes を後で定義するため plpgsql にしている）
 create or replace function public.community__is_active_user(p_user uuid)
 returns boolean
-language sql
+language plpgsql
 stable
 security definer
 set search_path = public
 as $$
-  select p_user is not null and (
-    public.community__is_staff(p_user)
-    or (
-      not public.community__is_banned(p_user)
-      and public.community__customer_id(p_user) is not null
-    )
-  );
+begin
+  if p_user is null then
+    return false;
+  end if;
+  if public.community__is_staff(p_user) then
+    return true;
+  end if;
+  return not public.community__is_banned(p_user)
+    and public.community__customer_id(p_user) is not null
+    and public.community__member_codes(p_user) <> array['FREE']::text[];
+end;
 $$;
 
 -- 現在コミュニティに入れるか（運営、または利用停止中でない有効な会員。公開操作は不要）
@@ -430,6 +465,8 @@ set search_path = public
 as $$
 declare
   v_c record;
+  v_access text;
+  v_row boolean;
 begin
   if p_channel is null or p_user is null then
     return false;
@@ -438,7 +475,7 @@ begin
     return false;
   end if;
 
-  select c.kind, c.visibility, c.audience, c.audience_plan_codes, c.audience_horse_ids
+  select c.kind, c.category, c.visibility, c.audience, c.audience_plan_codes, c.audience_horse_ids, c.is_hidden
     into v_c
   from public.community_channels c
   where c.id = p_channel;
@@ -454,14 +491,34 @@ begin
     );
   end if;
 
+  -- 非表示にしたチャンネルは、運営を含めて誰にも表示しない
+  if v_c.is_hidden then
+    return false;
+  end if;
+
   if public.community__is_staff(p_user) then
     return true;
   end if;
 
+  select m.access into v_access
+  from public.community_channel_members m
+  where m.channel_id = p_channel and m.user_id = p_user;
+  v_row := found;
+
+  -- 運営が外した人は閲覧できない。運営が追加した人は、対象者に当てはまらなくても閲覧できる。
+  if v_access = 'removed' then
+    return false;
+  end if;
+  if v_access = 'granted' then
+    return true;
+  end if;
+
   if v_c.visibility = 'private' then
-    return exists (
-      select 1 from public.community_channel_members m
-      where m.channel_id = p_channel and m.user_id = p_user
+    -- 非公開チャンネルは行がある人がメンバー。ただし会員種別のない会員（無料会員）は、運営が追加した
+    -- 場合（上の granted）とお知らせのチャンネルを除き、行が残っていても閲覧できない。
+    return v_row and (
+      v_c.category = 'announcement'
+      or public.community__member_codes(p_user) <> array['FREE']::text[]
     );
   end if;
 
@@ -601,16 +658,29 @@ as $$
     and (
       (c.kind = 'dm' and m.user_id is not null)
       or (
-        c.kind = 'channel' and (
+        -- 非表示にしたチャンネルは、運営を含めて誰にも表示しない
+        c.kind = 'channel' and not c.is_hidden and (
           v.staff
-          or (c.visibility = 'private' and m.user_id is not null)
           or (
-            c.visibility = 'public' and v.has_customer and (
-              c.audience = 'all'
-              or (c.audience = 'plans' and c.audience_plan_codes && v.codes)
+            -- 運営が外した人（removed）には表示しない
+            m.access is distinct from 'removed'
+            and (
+              -- 運営が追加した人（granted）は、対象者に当てはまらなくてもメンバー
+              m.access = 'granted'
+              -- 非公開チャンネルは行がある人。無料会員は、お知らせを除き、運営が追加した場合だけ
               or (
-                c.audience = 'supporters' and cardinality(v.horses) > 0
-                and (cardinality(c.audience_horse_ids) = 0 or c.audience_horse_ids && v.horses)
+                c.visibility = 'private' and m.user_id is not null
+                and (c.category = 'announcement' or v.codes <> array['FREE']::text[])
+              )
+              or (
+                c.visibility = 'public' and v.has_customer and (
+                  c.audience = 'all'
+                  or (c.audience = 'plans' and c.audience_plan_codes && v.codes)
+                  or (
+                    c.audience = 'supporters' and cardinality(v.horses) > 0
+                    and (cardinality(c.audience_horse_ids) = 0 or c.audience_horse_ids && v.horses)
+                  )
+                )
               )
             )
           )
@@ -691,8 +761,10 @@ as $$
       ) as horses
     from members m
   )
-  select d.uid, false, case when cardinality(d.codes) = 0 then array['FREE']::text[] else d.codes end, d.horses
+  -- コミュニティを利用できるのは有料会員（会員種別のある会員）だけ。会員種別のない会員（無料会員）は含めない。
+  select d.uid, false, d.codes, d.horses
   from detail d
+  where cardinality(d.codes) > 0
   union all
   select s.uid, true, '{}'::text[], '{}'::uuid[]
   from staff s;
@@ -701,6 +773,7 @@ $$;
 -- チャンネルごとのメンバー数（Slack と同じく、そのチャンネルに参加している人の数）
 --   DM: 参加者 / 非公開: 招待されたメンバー / 公開・自動参加: 参加資格のある全員（退出した人を除く）
 --   公開・任意参加: 参加資格があり、参加している人
+--   どのチャンネルでも、運営が追加した人（granted）を含み、運営が外した人（removed）を含まない
 create or replace function public.community__member_counts(p_channels uuid[])
 returns table (channel_id uuid, member_count integer)
 language sql
@@ -727,29 +800,37 @@ as $$
           select count(*) from public.community_channel_members m
           join pool p on p.user_id = m.user_id
           where m.channel_id = ch.id and not m.hidden
+            and m.access is distinct from 'removed'
+            -- 無料会員は、運営が追加した場合とお知らせを除き、メンバーに数えない（閲覧できないため）
+            and (p.is_staff or m.access = 'granted' or ch.category = 'announcement' or p.codes <> array['FREE']::text[])
         )
         else (
           select count(*) from pool p
-          where (
-              p.is_staff
-              or case ch.audience
-                when 'all' then true
-                when 'plans' then ch.audience_plan_codes && p.codes
-                when 'supporters' then cardinality(p.horses) > 0
-                  and (cardinality(ch.audience_horse_ids) = 0 or ch.audience_horse_ids && p.horses)
-                else false
-              end
+          left join public.community_channel_members m
+            on m.channel_id = ch.id and m.user_id = p.user_id
+          -- 運営が外した人は数えない
+          where m.access is distinct from 'removed'
+            and (
+              -- 運営が追加した人
+              (m.access = 'granted' and not m.hidden)
+              -- 対象者（参加している人。自動参加のチャンネルは、退出していない人）
+              or (
+                (
+                  p.is_staff
+                  or case ch.audience
+                    when 'all' then true
+                    when 'plans' then ch.audience_plan_codes && p.codes
+                    when 'supporters' then cardinality(p.horses) > 0
+                      and (cardinality(ch.audience_horse_ids) = 0 or ch.audience_horse_ids && p.horses)
+                    else false
+                  end
+                )
+                and case
+                  when ch.auto_join then not coalesce(m.hidden, false)
+                  else m.user_id is not null and not m.hidden
+                end
+              )
             )
-            and case
-              when ch.auto_join then not exists (
-                select 1 from public.community_channel_members m
-                where m.channel_id = ch.id and m.user_id = p.user_id and m.hidden
-              )
-              else exists (
-                select 1 from public.community_channel_members m
-                where m.channel_id = ch.id and m.user_id = p.user_id and not m.hidden
-              )
-            end
         )
       end
     )::integer
@@ -943,6 +1024,7 @@ declare
   v_uid uuid := auth.uid();
   v_staff boolean;
   v_member boolean;
+  v_free boolean;
   v_cust record;
   v_ban jsonb;
   v_profile jsonb;
@@ -953,6 +1035,10 @@ begin
 
   v_staff := public.community__is_staff(v_uid);
   v_member := public.community__is_member(v_uid);
+  -- 会員種別のない会員（無料会員）は利用できない。画面の案内を出し分けるために知らせる。
+  v_free := not v_staff
+    and public.community__customer_id(v_uid) is not null
+    and public.community__member_codes(v_uid) = array['FREE']::text[];
 
   select jsonb_build_object('reason', b.reason, 'until', b.until)
     into v_ban
@@ -996,6 +1082,7 @@ begin
     'is_open', true,
     'is_active', public.community__is_active_user(v_uid),
     'is_member', v_member,
+    'is_free', v_free,
     'ban', v_ban,
     'profile', v_profile
   );
@@ -1088,7 +1175,8 @@ returns table (
   can_manage boolean,
   last_message_preview text,
   last_message_user_id uuid,
-  member_count integer
+  member_count integer,
+  label text
 )
 language plpgsql
 stable
@@ -1143,8 +1231,12 @@ begin
     -- 最新メッセージの冒頭（DM 一覧の表示用）
     case when s.kind = 'dm' then left(lm.body, 140) end,
     case when s.kind = 'dm' then lm.user_id end,
-    coalesce(mc.member_count, 0)
+    coalesce(mc.member_count, 0),
+    -- DM に自分で付けた名前（運営のみ付けられる。相手には見えない）
+    dl.label
   from vis s
+  left join public.community_dm_labels dl
+    on dl.channel_id = s.id and dl.user_id = v_uid
   left join public.community__member_counts((select array_agg(v2.id) from vis v2)) mc
     on mc.channel_id = s.id
   left join lateral (
@@ -1238,7 +1330,7 @@ begin
 end;
 $$;
 
--- 公開チャンネルに参加（退出後の再参加を含む）
+-- チャンネルに参加する。会員は、自動で参加するチャンネルへの再参加（退出後）のみ。運営は制限なし。
 create or replace function public.community_join(p_channel uuid)
 returns void
 language plpgsql
@@ -1248,7 +1340,7 @@ set search_path = public
 as $$
 declare
   v_uid uuid := auth.uid();
-  v_kind text;
+  v_c record;
 begin
   if v_uid is null then
     raise exception 'ログインが必要です。' using errcode = '28000';
@@ -1256,8 +1348,19 @@ begin
   if not public.community__can_read(p_channel, v_uid) then
     raise exception 'このチャンネルには参加できません。' using errcode = '42501';
   end if;
-  select c.kind into v_kind from public.community_channels c where c.id = p_channel;
-  if v_kind <> 'channel' then
+  select c.kind, c.visibility, c.auto_join into v_c from public.community_channels c where c.id = p_channel;
+  if v_c.kind <> 'channel' then
+    raise exception 'このチャンネルには参加できません。' using errcode = '42501';
+  end if;
+  -- 会員が自分で参加できるのは、会員種別などに応じて自動で参加するチャンネルか、運営に追加されたチャンネルに
+  -- 戻るとき（退出後の再参加）だけ。それ以外のチャンネルへの追加は運営が行う。
+  -- （運営が外した人は、上の community__can_read で断られる）
+  if not public.community__is_staff(v_uid)
+     and not (v_c.visibility = 'public' and v_c.auto_join)
+     and not exists (
+       select 1 from public.community_channel_members m
+       where m.channel_id = p_channel and m.user_id = v_uid and m.access = 'granted'
+     ) then
     raise exception 'このチャンネルには参加できません。' using errcode = '42501';
   end if;
 
@@ -1519,6 +1622,50 @@ begin
   end if;
 
   return v_id;
+end;
+$$;
+
+-- DM に自分用の名前を付ける（運営のみ。'' または null で名前を消し、相手の表示名に戻す）。
+-- 名前は付けた本人にだけ表示する（相手には見えない）。
+create or replace function public.community_set_dm_label(p_channel uuid, p_label text)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_label text := nullif(btrim(coalesce(p_label, '')), '');
+begin
+  if v_uid is null then
+    raise exception 'ログインが必要です。' using errcode = '28000';
+  end if;
+  if not public.community__is_staff(v_uid) then
+    raise exception 'ダイレクトメッセージの名前を変更できるのは運営のみです。' using errcode = '42501';
+  end if;
+  if not exists (
+    select 1
+    from public.community_channels c
+    join public.community_channel_members m on m.channel_id = c.id and m.user_id = v_uid
+    where c.id = p_channel and c.kind = 'dm'
+  ) then
+    raise exception 'ダイレクトメッセージが見つかりません。' using errcode = 'P0002';
+  end if;
+  if v_label is not null and char_length(v_label) > 60 then
+    raise exception '名前は60文字以内で入力してください。' using errcode = '22023';
+  end if;
+
+  if v_label is null then
+    delete from public.community_dm_labels l
+    where l.channel_id = p_channel and l.user_id = v_uid;
+  else
+    insert into public.community_dm_labels (channel_id, user_id, label, updated_at)
+    values (p_channel, v_uid, v_label, now())
+    on conflict (channel_id, user_id) do update
+      set label = excluded.label, updated_at = now();
+  end if;
+  return v_label;
 end;
 $$;
 
@@ -2315,9 +2462,8 @@ begin
 end;
 $$;
 
--- チャンネルを作成する（会員も作成できる）。作成者はメンバーになり、p_members も追加する。
---   会員: 誰でも投稿できる・自動参加なしのチャンネルのみ。1日5個・同時に30個まで。
---   運営: 「運営のみ投稿（お知らせ用）」「全員を自動参加」も指定できる。
+-- チャンネルを作成する（運営のみ。2026-10-12 から会員は作成できない）。作成者はメンバーになり、p_members も追加する。
+--   「運営のみ投稿（お知らせ用）」「全員を自動参加」も指定できる。
 create or replace function public.community_create_channel(
   p_name text,
   p_description text default null,
@@ -2350,10 +2496,8 @@ begin
     raise exception 'コミュニティを利用できません。' using errcode = '42501';
   end if;
   v_staff := public.community__is_staff(v_uid);
-  if not v_staff and not exists (
-    select 1 from public.community_profiles p where p.user_id = v_uid and p.setup_done
-  ) then
-    raise exception '先にプロフィール（表示名）を設定してください。' using errcode = '42501';
+  if not v_staff then
+    raise exception 'チャンネルを作成できるのは運営のみです。' using errcode = '42501';
   end if;
   if p_visibility is null or p_visibility not in ('public', 'private') then
     raise exception '公開範囲の指定が不正です。' using errcode = '22023';
@@ -2513,8 +2657,81 @@ begin
 end;
 $$;
 
--- メンバーを追加する（チャンネルの参加者と運営）。追加した人数を返す。
---   公開チャンネル: 参加資格のある人のみ / 非公開チャンネル: 招待した人がメンバーになる
+-- 運営がチャンネルのメンバーを手動で追加・削除する（内部用。呼び出し側で運営であることを確認する）。
+-- メンバーかどうかが変わったら true を返す。
+--   add   : メンバーにする。対象者に当てはまらない人・非公開チャンネルは granted として記録する。
+--   remove: メンバーから外す。公開チャンネルは removed として記録し、本人は自分では戻れない。
+--   reset : 手動の指定を取り消し、対象者の規則どおりに戻す。
+create or replace function public.community__set_member(p_channel uuid, p_user uuid, p_action text)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_c record;
+  v_staff boolean;
+  v_eligible boolean;
+  v_before boolean;
+  v_after boolean;
+begin
+  if p_channel is null or p_user is null then
+    return false;
+  end if;
+  if p_action is null or p_action not in ('add', 'remove', 'reset') then
+    raise exception '操作の指定が不正です。' using errcode = '22023';
+  end if;
+  select c.kind, c.visibility, c.audience, c.audience_plan_codes, c.audience_horse_ids
+    into v_c
+  from public.community_channels c where c.id = p_channel;
+  if not found or v_c.kind <> 'channel' then
+    raise exception 'チャンネルが見つかりません。' using errcode = 'P0002';
+  end if;
+
+  v_staff := public.community__is_staff(p_user);
+  select coalesce((select v.is_joined from public.community__visible_channels(p_user) v where v.id = p_channel), false)
+    into v_before;
+
+  if p_action = 'add' then
+    if not public.community__is_active_user(p_user) then
+      return false;
+    end if;
+    -- 対象者に当てはまる人（と運営）は、手動の指定を消して参加中にするだけでよい
+    v_eligible := v_staff or (
+      v_c.visibility = 'public'
+      and public.community__eligible(p_user, v_c.audience, v_c.audience_plan_codes, v_c.audience_horse_ids)
+    );
+    insert into public.community_channel_members (channel_id, user_id, hidden, access)
+    values (p_channel, p_user, false, case when v_eligible then null else 'granted' end)
+    on conflict (channel_id, user_id) do update
+      set hidden = false, access = excluded.access;
+  elsif p_action = 'remove' then
+    if v_c.visibility = 'private' then
+      delete from public.community_channel_members m
+      where m.channel_id = p_channel and m.user_id = p_user;
+    else
+      -- 運営のアカウントは常に閲覧できるため、メンバーの一覧から外すだけ（退出と同じ）
+      insert into public.community_channel_members (channel_id, user_id, hidden, access)
+      values (p_channel, p_user, true, case when v_staff then null else 'removed' end)
+      on conflict (channel_id, user_id) do update
+        set hidden = true, access = excluded.access;
+    end if;
+  else
+    update public.community_channel_members m
+      set access = null, hidden = false
+    where m.channel_id = p_channel and m.user_id = p_user and m.access is not null;
+  end if;
+
+  select coalesce((select v.is_joined from public.community__visible_channels(p_user) v where v.id = p_channel), false)
+    into v_after;
+  return v_after is distinct from v_before;
+end;
+$$;
+
+-- メンバーを追加する（運営のみ。2026-10-12 から会員は追加できない）。追加した人数を返す。
+--   どのチャンネルにも追加できる。対象者に当てはまらない人・非公開チャンネルは「運営が追加した人」
+--   （granted）として記録し、会員種別に関係なくメンバーになる（community__set_member）。
 create or replace function public.community_invite(p_channel uuid, p_users uuid[])
 returns integer
 language plpgsql
@@ -2526,15 +2743,13 @@ declare
   v_uid uuid := auth.uid();
   v_c record;
   v_staff boolean;
-  v_joined boolean;
   v_member uuid;
-  v_n integer;
   v_count integer := 0;
 begin
   if v_uid is null then
     raise exception 'ログインが必要です。' using errcode = '28000';
   end if;
-  select c.kind, c.visibility, c.is_archived, c.auto_join into v_c
+  select c.kind, c.is_archived into v_c
   from public.community_channels c where c.id = p_channel;
   if not found or v_c.kind <> 'channel' or not public.community__can_read(p_channel, v_uid) then
     raise exception 'チャンネルが見つかりません。' using errcode = 'P0002';
@@ -2543,14 +2758,8 @@ begin
     raise exception 'アーカイブされたチャンネルです。' using errcode = '42501';
   end if;
   v_staff := public.community__is_staff(v_uid);
-  select v.is_joined into v_joined from public.community__visible_channels(v_uid) v where v.id = p_channel;
-  if not v_staff and not coalesce(v_joined, false) then
-    raise exception 'メンバーを追加するには、先にチャンネルに参加してください。' using errcode = '42501';
-  end if;
-  if not v_staff and not exists (
-    select 1 from public.community_profiles p where p.user_id = v_uid and p.setup_done
-  ) then
-    raise exception '先にプロフィール（表示名）を設定してください。' using errcode = '42501';
+  if not v_staff then
+    raise exception 'メンバーを追加できるのは運営のみです。' using errcode = '42501';
   end if;
 
   for v_member in
@@ -2559,27 +2768,17 @@ begin
     where u.id is not null and u.id <> v_uid
     limit 100
   loop
-    continue when not public.community__is_active_user(v_member);
-    if v_c.visibility = 'public' then
-      continue when not public.community__can_read(p_channel, v_member);
-      -- 自動参加のチャンネルは、退出していなければすでにメンバー
-      continue when v_c.auto_join and not exists (
-        select 1 from public.community_channel_members m
-        where m.channel_id = p_channel and m.user_id = v_member and m.hidden
-      );
+    -- すでにメンバーの人は数えない（追加した人数だけを返す）
+    if public.community__set_member(p_channel, v_member, 'add') then
+      v_count := v_count + 1;
     end if;
-    insert into public.community_channel_members (channel_id, user_id, hidden)
-    values (p_channel, v_member, false)
-    on conflict (channel_id, user_id) do update set hidden = false
-      where public.community_channel_members.hidden;
-    get diagnostics v_n = row_count;
-    v_count := v_count + v_n;
   end loop;
   return v_count;
 end;
 $$;
 
--- 非公開チャンネルからメンバーを外す（作成者と運営のみ。自分自身の場合は退出）
+-- チャンネルからメンバーを外す（自分自身の場合は退出）。
+--   非公開チャンネル: 作成者と運営 / 公開チャンネル: 運営のみ（運営が外した人は、自分では戻れない）
 create or replace function public.community_remove_member(p_channel uuid, p_user uuid)
 returns void
 language plpgsql
@@ -2605,11 +2804,10 @@ begin
   if not public.community__can_manage(p_channel, v_uid) then
     raise exception 'メンバーを外せるのはチャンネルの作成者と運営のみです。' using errcode = '42501';
   end if;
-  if v_c.visibility <> 'private' then
-    raise exception '公開チャンネルからメンバーを外すことはできません（本人が退出できます）。' using errcode = '42501';
+  if v_c.visibility <> 'private' and not public.community__is_staff(v_uid) then
+    raise exception '公開チャンネルからメンバーを外せるのは運営のみです。' using errcode = '42501';
   end if;
-  delete from public.community_channel_members m
-  where m.channel_id = p_channel and m.user_id = p_user;
+  perform public.community__set_member(p_channel, p_user, 'remove');
 end;
 $$;
 
@@ -2635,7 +2833,7 @@ begin
   if not public.community__can_read(p_channel, v_uid) then
     raise exception 'このチャンネルは閲覧できません。' using errcode = '42501';
   end if;
-  select c.kind, c.visibility, c.auto_join, c.audience, c.audience_plan_codes, c.audience_horse_ids
+  select c.kind, c.category, c.visibility, c.auto_join, c.audience, c.audience_plan_codes, c.audience_horse_ids
     into v_c
   from public.community_channels c where c.id = p_channel;
   v_staff := public.community__is_staff(v_uid);
@@ -2650,30 +2848,38 @@ begin
     select coalesce(array_agg(m.user_id order by m.joined_at), '{}'::uuid[]) into v_ids
     from public.community_channel_members m
     join public.community__member_pool() p on p.user_id = m.user_id
-    where m.channel_id = p_channel and not m.hidden;
+    where m.channel_id = p_channel and not m.hidden
+      and m.access is distinct from 'removed'
+      -- 無料会員は、運営が追加した場合とお知らせを除き、メンバーに数えない（閲覧できないため）
+      and (p.is_staff or m.access = 'granted' or v_c.category = 'announcement' or p.codes <> array['FREE']::text[]);
   else
     select coalesce(array_agg(p.user_id), '{}'::uuid[]) into v_ids
     from public.community__member_pool() p
-    where (
-        p.is_staff
-        or case v_c.audience
-          when 'all' then true
-          when 'plans' then v_c.audience_plan_codes && p.codes
-          when 'supporters' then cardinality(p.horses) > 0
-            and (cardinality(v_c.audience_horse_ids) = 0 or v_c.audience_horse_ids && p.horses)
-          else false
-        end
-      )
-      and case
-        when v_c.auto_join then not exists (
-          select 1 from public.community_channel_members m
-          where m.channel_id = p_channel and m.user_id = p.user_id and m.hidden
+    left join public.community_channel_members m
+      on m.channel_id = p_channel and m.user_id = p.user_id
+    -- 運営が外した人は含めない
+    where m.access is distinct from 'removed'
+      and (
+        -- 運営が追加した人
+        (m.access = 'granted' and not m.hidden)
+        -- 対象者（参加している人。自動参加のチャンネルは、退出していない人）
+        or (
+          (
+            p.is_staff
+            or case v_c.audience
+              when 'all' then true
+              when 'plans' then v_c.audience_plan_codes && p.codes
+              when 'supporters' then cardinality(p.horses) > 0
+                and (cardinality(v_c.audience_horse_ids) = 0 or v_c.audience_horse_ids && p.horses)
+              else false
+            end
+          )
+          and case
+            when v_c.auto_join then not coalesce(m.hidden, false)
+            else m.user_id is not null and not m.hidden
+          end
         )
-        else exists (
-          select 1 from public.community_channel_members m
-          where m.channel_id = p_channel and m.user_id = p.user_id and not m.hidden
-        )
-      end;
+      );
   end if;
 
   select coalesce(array_agg(x.id), '{}'::uuid[]) into v_show
@@ -2693,7 +2899,8 @@ begin
 end;
 $$;
 
--- チャンネルに追加できる人の候補（表示名を設定済みの利用者。p_channel を指定すると参加中の人を除く）
+-- チャンネルに追加できる人の候補（運営のみ。コミュニティを利用できる会員全員から、表示名・氏名・フリガナで探す。
+-- p_channel を指定すると、そのチャンネルに行があって参加中の人を除く）
 create or replace function public.community_invite_candidates(p_channel uuid default null, p_query text default '')
 returns table (
   user_id uuid,
@@ -2712,41 +2919,61 @@ declare
   v_uid uuid := auth.uid();
   v_q text := btrim(coalesce(p_query, ''));
   v_pattern text;
-  v_staff boolean;
 begin
   if v_uid is null or not public.community__is_member(v_uid) then
     raise exception 'コミュニティを利用できません。' using errcode = '42501';
   end if;
-  if p_channel is not null and not public.community__can_read(p_channel, v_uid) then
-    raise exception 'このチャンネルは閲覧できません。' using errcode = '42501';
+  -- メンバーを追加できるのは運営のみ
+  if not public.community__is_staff(v_uid) then
+    return;
   end if;
-  v_staff := public.community__is_staff(v_uid);
   v_pattern := '%' || replace(replace(replace(left(v_q, 50), '\', '\\'), '%', '\%'), '_', '\_') || '%';
 
   return query
-  select cp.user_id, cp.display_name, cp.avatar_url, cp.is_staff, cu.full_name
-  from public.community_profiles cp
-  left join lateral (
-    select c.full_name
+  with cand as (
+    select c.auth_user_id as uid, c.full_name as real_name, c.full_name_kana as kana,
+           c.username, c.avatar_url as cust_avatar
     from public.customers c
-    where v_staff and c.auth_user_id = cp.user_id
-    order by c.created_at
-    limit 1
-  ) cu on true
-  where cp.display_name is not null
-    and cp.user_id <> v_uid
-    and (cp.setup_done or cp.is_staff)
-    and (v_q = '' or cp.display_name ilike v_pattern or cu.full_name ilike v_pattern)
+    where c.auth_user_id is not null
+    union all
+    select p.id, null::text, null::text, null::text, null::text
+    from public.profiles p
+    where p.role in ('owner', 'admin', 'moderator')
+      and not exists (select 1 from public.customers c2 where c2.auth_user_id = p.id)
+  ),
+  uniq as (
+    select distinct on (cand.uid) cand.*
+    from cand
+    order by cand.uid, cand.real_name nulls last
+  )
+  select
+    u.uid,
+    coalesce(cp.display_name, nullif(btrim(u.username), '')),
+    coalesce(cp.avatar_url, u.cust_avatar),
+    public.community__is_staff(u.uid),
+    u.real_name
+  from uniq u
+  left join public.community_profiles cp on cp.user_id = u.uid
+  where u.uid <> v_uid
+    and (
+      v_q = ''
+      or cp.display_name ilike v_pattern
+      or u.real_name ilike v_pattern
+      or u.kana ilike v_pattern
+      or u.username ilike v_pattern
+    )
     and (
       p_channel is null
       or not exists (
         select 1 from public.community_channel_members m
-        where m.channel_id = p_channel and m.user_id = cp.user_id and not m.hidden
+        where m.channel_id = p_channel and m.user_id = u.uid and not m.hidden
+          and m.access is distinct from 'removed'
       )
     )
-    and public.community__is_active_user(cp.user_id)
-    and not exists (select 1 from public.community_hidden_users h where h.user_id = cp.user_id)
-  order by cp.is_staff desc, cp.display_name
+    and public.community__is_active_user(u.uid)
+    and not exists (select 1 from public.community_hidden_users h where h.user_id = u.uid)
+  order by public.community__is_staff(u.uid) desc,
+           coalesce(cp.display_name, u.username, u.real_name)
   limit 30;
 end;
 $$;
@@ -2874,6 +3101,8 @@ as $$
     and c.registration_completed is not false
     and not public.community__is_banned(c.auth_user_id)
     and not public.community__is_staff(c.auth_user_id)
+    -- コミュニティを利用できる会員（有料会員）だけ
+    and public.community__is_active_user(c.auth_user_id)
     and public.community__eligible(c.auth_user_id, p_audience, p_codes, p_horses);
 $$;
 
@@ -2948,6 +3177,32 @@ begin
 end;
 $$;
 
+-- 管理画面からのメンバーの追加・削除・取り消し（1回に500人まで）。変わった人数を返す。
+create or replace function public.community_admin_set_members(p_channel uuid, p_users uuid[], p_action text)
+returns integer
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid;
+  v_count integer := 0;
+begin
+  for v_user in
+    select distinct u.id
+    from unnest(coalesce(p_users, '{}'::uuid[])) as u(id)
+    where u.id is not null
+    limit 500
+  loop
+    if public.community__set_member(p_channel, v_user, p_action) then
+      v_count := v_count + 1;
+    end if;
+  end loop;
+  return v_count;
+end;
+$$;
+
 -- チャンネルごとの投稿数・最終投稿（管理画面の一覧用）
 create or replace function public.community_admin_channel_stats()
 returns table (channel_id uuid, message_count bigint, last_message_at timestamptz, member_rows bigint)
@@ -2992,6 +3247,10 @@ alter table public.community_reports enable row level security;
 -- 表示しないアカウントの一覧はサーバー側（security definer の関数）からのみ参照する
 alter table public.community_hidden_users enable row level security;
 revoke all on public.community_hidden_users from anon, authenticated;
+-- DM の表示名は、付けた本人の分だけを関数（community_list_channels）が返す。直接の参照は許可しない
+alter table public.community_dm_labels enable row level security;
+revoke all on public.community_dm_labels from anon, authenticated;
+grant all on table public.community_dm_labels to service_role;
 
 drop policy if exists "community profiles read" on public.community_profiles;
 create policy "community profiles read" on public.community_profiles
@@ -3092,6 +3351,8 @@ revoke all on function public.community__check_channel_name(text, boolean) from 
 revoke all on function public.community__users_json(uuid[]) from public, anon, authenticated;
 revoke all on function public.community__member_pool() from public, anon, authenticated;
 revoke all on function public.community__member_counts(uuid[]) from public, anon, authenticated;
+revoke all on function public.community__set_member(uuid, uuid, text) from public, anon, authenticated;
+revoke all on function public.community_admin_set_members(uuid, uuid[], text) from public, anon, authenticated;
 revoke all on function public.community_audience_users(text, text[], uuid[]) from public, anon, authenticated;
 revoke all on function public.community_bulk_dm(uuid, uuid[], text) from public, anon, authenticated;
 revoke all on function public.community_admin_channel_stats() from public, anon, authenticated;
@@ -3101,6 +3362,7 @@ grant execute on function public.community_audience_users(text, text[], uuid[]) 
 grant execute on function public.community_bulk_dm(uuid, uuid[], text) to service_role;
 grant execute on function public.community_admin_channel_stats() to service_role;
 grant execute on function public.community_admin_user_stats() to service_role;
+grant execute on function public.community_admin_set_members(uuid, uuid[], text) to service_role;
 
 do $$
 declare
@@ -3125,6 +3387,7 @@ begin
     'public.community_mark_unread(uuid)',
     'public.community_set_prefs(uuid, text, boolean)',
     'public.community_open_dm(uuid)',
+    'public.community_set_dm_label(uuid, text)',
     'public.community_send(uuid, text, uuid, jsonb, uuid[], boolean)',
     'public.community_edit(uuid, text, uuid[])',
     'public.community_delete(uuid)',

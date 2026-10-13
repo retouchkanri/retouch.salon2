@@ -1,19 +1,23 @@
 import { requireCapability } from "@/lib/auth";
-import { followUpRiskYen } from "@/lib/followUp";
-import { loadFollowUps } from "@/lib/followUpData";
-import { formatYen } from "@/lib/format";
+import type { FollowMark } from "@/lib/followUp";
+import { loadFollowUpMarks, loadFollowUps } from "@/lib/followUpData";
 import FollowUpBoard from "./FollowUpBoard";
 
 export const dynamic = "force-dynamic";
 
 export default async function FollowUpsPage() {
   await requireCapability("payments.manage");
-  const loaded = await loadFollowUps().catch((error: unknown) => ({
-    rows: [],
-    loginError: null as string | null,
-    error: error instanceof Error ? error.message : "要フォローを読み込めませんでした。",
-  }));
-  const risk = followUpRiskYen(loaded.rows);
+  const [loaded, marks] = await Promise.all([
+    loadFollowUps().catch((error: unknown) => ({
+      rows: [],
+      loginError: null as string | null,
+      error: error instanceof Error ? error.message : "要フォローを読み込めませんでした。",
+    })),
+    // 印が読み込めなくても、一覧は出す（全員が未対応として並ぶ）。
+    loadFollowUpMarks()
+      .then((list) => ({ list, error: null as string | null }))
+      .catch(() => ({ list: [] as FollowMark[], error: "「済」「削除」の印を読み込めませんでした。全員を未対応として表示しています。" })),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -23,11 +27,8 @@ export default async function FollowUpsPage() {
       </div>
       {"error" in loaded && loaded.error ? <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{loaded.error}</p> : null}
       {loaded.loginError ? <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{loaded.loginError}</p> : null}
-      <section className="card">
-        <p className="text-sm">対象 {loaded.rows.length}名。いま関係している月額は {formatYen(risk.monthly)} で、このまま途切れると年間 {formatYen(risk.annual)} です。</p>
-        <p className="mt-1 text-xs text-ink-mute">たとえば月額3,600円の方が10名そのまま離れると、年間では43万円を超えます。案内文はお一人ずつコピーして送れます。</p>
-      </section>
-      <FollowUpBoard rows={loaded.rows} />
+      {marks.error ? <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{marks.error}</p> : null}
+      <FollowUpBoard rows={loaded.rows} marks={marks.list} />
     </div>
   );
 }

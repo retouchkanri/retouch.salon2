@@ -1,7 +1,34 @@
 import { fetchAllRows } from "@/lib/fetchAll";
 import { HIDDEN_ACCOUNT_EMAILS } from "@/lib/hiddenAccounts";
-import { buildFollowUps, type FollowUp } from "@/lib/followUp";
+import { buildFollowUps, latestFollowMarks, type FollowMark, type FollowMarkEvent, type FollowUp } from "@/lib/followUp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
+/**
+ * 「済」「削除」の印は、監査ログに 1件ずつ残す（誰が・いつ・どの理由のときにつけたか）。
+ * 顧客ごとに、いちばん新しい記録がいまの印。followup.open は「未対応に戻す」。
+ */
+export const FOLLOW_MARK_ACTIONS = ["followup.done", "followup.dismissed", "followup.open"] as const;
+
+export async function loadFollowUpMarks(): Promise<FollowMark[]> {
+  const admin = createSupabaseAdminClient();
+  const { rows, error } = await fetchAllRows<{ action: string; target_id: string | null; meta: { reasons?: unknown } | null; created_at: string }>((from, to) =>
+    admin
+      .from("audit_logs")
+      .select("action, target_id, meta, created_at")
+      .in("action", FOLLOW_MARK_ACTIONS as unknown as string[])
+      .order("created_at")
+      .order("id")
+      .range(from, to),
+  );
+  if (error) throw new Error(error.message ?? "要フォローの印を読み込めませんでした。");
+  const events: FollowMarkEvent[] = rows.map((row) => ({
+    customerId: row.target_id,
+    state: row.action.replace(/^followup\./, ""),
+    at: row.created_at,
+    reasons: row.meta?.reasons,
+  }));
+  return [...latestFollowMarks(events).values()];
+}
 
 export async function loadFollowUps(now = new Date()): Promise<{ rows: FollowUp[]; loginError: string | null }> {
   const admin = createSupabaseAdminClient();

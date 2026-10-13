@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node scripts/dev.js",
     "dev:3001": "node scripts/dev.js --work",
-    "dev:strict": "next dev -p 3000",
+    "dev:strict": "node scripts/dev.js --work",
     "build": "next build",
     "build:live": "node scripts/live.js build",
     "start:live": "node scripts/live.js start",

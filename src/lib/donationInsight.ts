@@ -26,6 +26,19 @@ export type IncomeSlice = {
   delta: number;
 };
 
+/**
+ * 口数が動いた人。名前は持たず、顧客 ID だけを持つ（名前は、画面を出すときに顧客情報から引く）。
+ * deltaUnits は、増えた分がプラス、減った分がマイナス。
+ */
+export type SupportMover = {
+  customerId: string;
+  horseId: string;
+  horseName: string;
+  deltaUnits: number;
+  /** 停止した支援の一覧でだけ使う。停止のあとも、同じ馬に残っている口数。 */
+  keptUnits?: number;
+};
+
 export type HorseMoney = {
   id: string;
   name: string;
@@ -35,6 +48,8 @@ export type HorseMoney = {
   currentYen: number;
   previousYen: number;
   deltaYen: number;
+  /** この月に、この馬の口数を増やした人・減らした人。 */
+  people: SupportMover[];
 };
 
 export type SignalLevel = "alert" | "watch" | "good";
@@ -45,12 +60,18 @@ export type OpsSignal = {
   detail: string;
   href: string;
   meter?: { label: string; value: string }[];
+  /** この項目にかかわる人（支援を停止した人、口数を減らした人）。 */
+  people?: SupportMover[];
+  /** people の出し方。"stopped" は、停止した支援の一覧。 */
+  peopleMode?: "delta" | "stopped";
 };
 
 export type GainedHorse = {
   id: string;
   name: string;
   deltaUnits: number;
+  /** この馬の口数を増やした人（新しく支援を始めた人を含む）。 */
+  people: SupportMover[];
 };
 
 /** 管理者が安心できる、今月すでに起きた良い動き。現在の月は「いま」まで。過去の月は月末まで。 */
@@ -73,6 +94,8 @@ export type GivingInsight = {
   shortHorses: { id: string; name: string; units: number }[];
   failedPayments: number;
   stoppedSupports: number;
+  /** この月に停止した支援。stoppedSupports と同じ件数で、新しい停止が先。 */
+  stopped: SupportMover[];
   bright: BrightSpot;
   signals: OpsSignal[];
 };
@@ -99,16 +122,49 @@ function monthEndTrail(year: number, month: number, units: number[]): string {
   return `月末まで有効な口数：${monthEndMeter(year, month, units).map((step) => `${step.label} ${step.value}`).join(" → ")}`;
 }
 
+/** 2つの時点のあいだに、馬ごとに、誰の口数がどれだけ動いたか。動いた口数の大きい順。 */
+function moversByHorse(source: ReportSource, fromMs: number, toMs: number, names: Map<string, string>): Map<string, SupportMover[]> {
+  const unitsOf = (rows: SupportRow[]) => {
+    const map = new Map<string, { horseId: string; customerId: string; units: number }>();
+    for (const row of rows) {
+      if (!row.customer_id) continue;
+      const key = `${row.horse_id}|${row.customer_id}`;
+      const cur = map.get(key) ?? { horseId: row.horse_id, customerId: row.customer_id, units: 0 };
+      cur.units += Number(row.units) || 0;
+      map.set(key, cur);
+    }
+    return map;
+  };
+  const before = unitsOf(supportsActiveAt(source, fromMs));
+  const after = unitsOf(supportsActiveAt(source, toMs));
+  const byHorse = new Map<string, SupportMover[]>();
+  for (const key of new Set([...before.keys(), ...after.keys()])) {
+    const delta = Math.round(((after.get(key)?.units ?? 0) - (before.get(key)?.units ?? 0)) * 100) / 100;
+    if (delta === 0) continue;
+    const { horseId, customerId } = (after.get(key) ?? before.get(key))!;
+    const list = byHorse.get(horseId) ?? [];
+    list.push({ customerId, horseId, horseName: names.get(horseId) ?? "（名称不明）", deltaUnits: delta });
+    byHorse.set(horseId, list);
+  }
+  for (const list of byHorse.values()) {
+    list.sort((a, b) => Math.abs(b.deltaUnits) - Math.abs(a.deltaUnits) || a.customerId.localeCompare(b.customerId));
+  }
+  return byHorse;
+}
+
 function buildBright(source: ReportSource, ym: string, start: number, end: number, now: Date): BrightSpot {
   const asOf = currentYearMonth(now) === ym ? Math.min(now.getTime(), end) : end;
   const names = new Map(source.horses.map((horse) => [horse.id, horse.name]));
   const before = horseMap(supportsActiveAt(source, start));
   const after = horseMap(supportsActiveAt(source, asOf));
+  const movers = moversByHorse(source, start, asOf, names);
   const gained: GainedHorse[] = [];
   for (const id of new Set([...before.keys(), ...after.keys()])) {
     const delta = Math.round(((after.get(id)?.units ?? 0) - (before.get(id)?.units ?? 0)) * 100) / 100;
     const name = names.get(id) ?? "（名称不明）";
-    if (delta > 0 && !isDeceased(name)) gained.push({ id, name, deltaUnits: delta });
+    if (delta > 0 && !isDeceased(name)) {
+      gained.push({ id, name, deltaUnits: delta, people: (movers.get(id) ?? []).filter((mover) => mover.deltaUnits > 0) });
+    }
   }
   gained.sort((a, b) => b.deltaUnits - a.deltaUnits || a.name.localeCompare(b.name, "ja"));
 
@@ -199,6 +255,7 @@ export function buildGivingInsight(source: ReportSource, ym: string, now = new D
   const nowMap = horseMap(supportsActiveAt(source, end));
   const prevMap = horseMap(supportsActiveAt(source, start));
   const ids = new Set([...nowMap.keys(), ...prevMap.keys(), ...source.horses.map((horse) => horse.id)]);
+  const movers = moversByHorse(source, start, end, names);
   const horses: HorseMoney[] = [];
   for (const id of ids) {
     const now = nowMap.get(id) ?? { units: 0, yen: 0 };
@@ -213,6 +270,7 @@ export function buildGivingInsight(source: ReportSource, ym: string, now = new D
       currentYen: now.yen,
       previousYen: before.yen,
       deltaYen: now.yen - before.yen,
+      people: movers.get(id) ?? [],
     });
   }
   horses.sort((a, b) => a.deltaYen - b.deltaYen);
@@ -230,6 +288,8 @@ export function buildGivingInsight(source: ReportSource, ym: string, now = new D
         months: units,
         trail: monthEndTrail(parsed.year, parsed.month, units),
         meter: monthEndMeter(parsed.year, parsed.month, units),
+        // この月に、この馬の口数を減らした人。
+        people: (movers.get(horse.id) ?? []).filter((mover) => mover.deltaUnits < 0),
       }];
     }
     return [];
@@ -248,7 +308,26 @@ export function buildGivingInsight(source: ReportSource, ym: string, now = new D
       !(payment.invoice_id && !payment.charge_id) &&
       inMonth(payment.occurred_at, start, end),
   ).length;
-  const stoppedSupports = source.supports.filter((support) => inMonth(support.canceled_at, start, end)).length;
+  const stoppedRows = source.supports
+    .filter((support) => inMonth(support.canceled_at, start, end))
+    .sort((a, b) => new Date(b.canceled_at!).getTime() - new Date(a.canceled_at!).getTime());
+  const stoppedSupports = stoppedRows.length;
+  // 同じ人が同じ馬の支援を続けているとき（口数を変えるために登録し直したときなど）は、残っている口数も添える。
+  const keptAtEnd = new Map<string, number>();
+  for (const row of supportsActiveAt(source, end)) {
+    const key = `${row.horse_id}|${row.customer_id}`;
+    keptAtEnd.set(key, (keptAtEnd.get(key) ?? 0) + (Number(row.units) || 0));
+  }
+  const stopped: SupportMover[] = stoppedRows.map((support) => {
+    const kept = keptAtEnd.get(`${support.horse_id}|${support.customer_id}`) ?? 0;
+    return {
+      customerId: support.customer_id,
+      horseId: support.horse_id,
+      horseName: names.get(support.horse_id) ?? "（名称不明）",
+      deltaUnits: -(Number(support.units) || 0),
+      ...(kept > 0 ? { keptUnits: kept } : {}),
+    };
+  });
   const bright = buildBright(source, ym, start, end, now);
 
   const slices = slicesOf(current, previous);
@@ -260,6 +339,7 @@ export function buildGivingInsight(source: ReportSource, ym: string, now = new D
     shortHorses,
     failedPayments,
     stoppedSupports,
+    stopped,
   });
 
   return {
@@ -272,9 +352,23 @@ export function buildGivingInsight(source: ReportSource, ym: string, now = new D
     shortHorses,
     failedPayments,
     stoppedSupports,
+    stopped,
     bright,
     signals,
   };
+}
+
+/** 画面に名前を出す人の顧客 ID（重複なし）。 */
+export function moverCustomerIds(insight: GivingInsight): string[] {
+  const ids = new Set<string>();
+  const add = (people: SupportMover[] | undefined) => {
+    for (const mover of people ?? []) if (mover.customerId) ids.add(mover.customerId);
+  };
+  add(insight.stopped);
+  for (const horse of insight.bright.gained) add(horse.people);
+  for (const horse of insight.horses) add(horse.people);
+  for (const signal of insight.signals) add(signal.people);
+  return [...ids];
 }
 
 function rate(current: number, previous: number): number | null {
@@ -286,10 +380,11 @@ export function buildSignals(input: {
   current: MonthReport;
   previous: MonthReport;
   slices: IncomeSlice[];
-  declining: { name: string; trail?: string; meter?: { label: string; value: string }[] }[];
+  declining: { name: string; trail?: string; meter?: { label: string; value: string }[]; people?: SupportMover[] }[];
   shortHorses: { name: string }[];
   failedPayments: number;
   stoppedSupports: number;
+  stopped?: SupportMover[];
 }): OpsSignal[] {
   const signals: OpsSignal[] = [];
   if (input.failedPayments > 0) {
@@ -306,6 +401,8 @@ export function buildSignals(input: {
       title: `支援停止 ${input.stoppedSupports}件`,
       detail: "今月、口数が終了した支援があります。",
       href: "/admin/supports",
+      people: input.stopped,
+      peopleMode: "stopped",
     });
   }
   const leaveNow = input.current.withdrawn / Math.max(1, input.previous.counts.total);
@@ -335,6 +432,7 @@ export function buildSignals(input: {
         : input.declining.slice(0, 3).map((horse) => horse.name).join("、"),
       meter: input.declining.length === 1 ? input.declining[0].meter : undefined,
       href: "/admin/giving",
+      people: input.declining.flatMap((horse) => horse.people ?? []),
     });
   }
   const memberRate = rate(input.current.counts.members, input.previous.counts.members);

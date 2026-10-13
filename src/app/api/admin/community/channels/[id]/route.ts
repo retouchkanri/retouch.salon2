@@ -36,7 +36,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     action: "community.channel_update",
     targetTable: "community_channels",
     targetId: params.id,
-    meta: { name: row.name, visibility: row.visibility, audience: row.audience, is_archived: row.is_archived ?? null },
+    meta: {
+      name: row.name,
+      visibility: row.visibility,
+      audience: row.audience,
+      is_archived: row.is_archived ?? null,
+      is_hidden: row.is_hidden ?? null,
+    },
   });
   return NextResponse.json({ ok: true });
 }

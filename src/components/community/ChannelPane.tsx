@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { canJoinChannel, dmTitle } from "@/lib/community/text";
 import type { ChannelRow } from "@/lib/community/types";
 import Avatar, { PresenceDot } from "./Avatar";
 import Composer from "./Composer";
@@ -121,7 +122,7 @@ function Header({ ch }: { ch: ChannelRow }) {
           <span className="min-w-0">
             <span className="flex items-center gap-1.5">
               <span className="truncate text-[17px] font-bold text-sk-text">
-                {isDm ? (self ? `${peerName}（自分）` : peerName) : ch.name}
+                {isDm ? dmTitle(ch, peerName, self) : ch.name}
               </span>
               {isDm && peerStaff && (
                 <span className="rounded-full bg-[#E3F0E8] px-2 py-[1px] text-[10px] font-bold text-[#2D6A4F]">運営</span>
@@ -132,6 +133,8 @@ function Header({ ch }: { ch: ChannelRow }) {
               !self && (
                 <span className="flex items-center gap-1.5 text-[12px] text-sk-mute">
                   <PresenceDot presence={peerPresence} size={7} ring="transparent" />
+                  {/* 自分で名前を付けた DM は、相手の表示名も添える */}
+                  {ch.label ? `${peerName}・` : ""}
                   {PRESENCE_LABEL[peerPresence]}
                 </span>
               )
@@ -184,6 +187,12 @@ function Header({ ch }: { ch: ChannelRow }) {
               label="チャンネルの設定"
               onClick={() => openModal({ type: "details", channelId: ch.id, tab: "settings" })}
             >
+              <Icon name="more" className="w-[18px] h-[18px]" />
+            </HeaderIconButton>
+          )}
+          {/* DM の名前の変更・削除は運営のみ */}
+          {isDm && me.isStaff && (
+            <HeaderIconButton label="ダイレクトメッセージの設定" onClick={() => openModal({ type: "dm", channelId: ch.id })}>
               <Icon name="more" className="w-[18px] h-[18px]" />
             </HeaderIconButton>
           )}
@@ -240,13 +249,15 @@ function Footer({ ch }: { ch: ChannelRow }) {
           >
             詳細
           </button>
-          <button
-            type="button"
-            className="h-9 rounded-[8px] bg-sk-green px-4 text-[15px] font-bold text-white hover:bg-sk-greenhover"
-            onClick={() => void actions.join(ch.id)}
-          >
-            チャンネルに参加する
-          </button>
+          {canJoinChannel(ch, me.isStaff) && (
+            <button
+              type="button"
+              className="h-9 rounded-[8px] bg-sk-green px-4 text-[15px] font-bold text-white hover:bg-sk-greenhover"
+              onClick={() => void actions.join(ch.id)}
+            >
+              チャンネルに参加する
+            </button>
+          )}
         </div>
       </div>
     );
@@ -316,6 +327,7 @@ function Typing({ channelId }: { channelId: string }) {
 
 function Welcome() {
   const openModal = useOpenModal();
+  const me = useMe();
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-[64px] shrink-0 items-center justify-end border-b border-[#EDF2EE] px-4">
@@ -334,13 +346,15 @@ function Welcome() {
         >
           チャンネル一覧
         </button>
-        <button
-          type="button"
-          onClick={() => openModal({ type: "create" })}
-          className="h-9 rounded-[8px] bg-sk-green px-4 text-[15px] font-bold text-white hover:bg-sk-greenhover"
-        >
-          チャンネルを作成する
-        </button>
+        {me.isStaff && (
+          <button
+            type="button"
+            onClick={() => openModal({ type: "create" })}
+            className="h-9 rounded-[8px] bg-sk-green px-4 text-[15px] font-bold text-white hover:bg-sk-greenhover"
+          >
+            チャンネルを作成する
+          </button>
+        )}
       </div>
     </div>
     </div>

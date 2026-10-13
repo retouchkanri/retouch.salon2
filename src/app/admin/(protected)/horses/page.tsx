@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import horseImage from "@/assets/images/horse.png";
+import { isRecruitmentSlot } from "@/lib/horses";
 import HorseForm from "./HorseForm";
 
 export default async function HorsesPage() {
@@ -33,6 +34,8 @@ export default async function HorsesPage() {
                       </div>
                     )}
                     <span className="font-semibold">{h.name}</span>
+                    {/* 新規募集の枠の行は公開ページ・会員の支援申込みに出ない。管理画面では、出ていない理由が分かるようにする。 */}
+                    {isRecruitmentSlot(h) && <span className="chip-mute whitespace-nowrap" title="馬名が「緊急支援募集馬」の行は、公開ページと会員の支援申込みには表示されません。馬の名前に直すと表示されます。">公開ページに非表示</span>}
                   </div>
                 </td>
                 <td>{h.name_kana ?? "—"}</td>

@@ -28,7 +28,8 @@ import {
   type SupportRow,
   type TrendMonth,
 } from "@/lib/monthlyReport";
-import { loadLiveSupport, loadStripeOtherFees } from "@/lib/stripeLive";
+import { loadLiveSupport, loadLiveSupportDetail, loadStripeOtherFees } from "@/lib/stripeLive";
+import { reconcileSupport, type ReconcileCustomer, type SiteSupportRow, type SupportReconciliation } from "@/lib/supportReconcile";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -355,7 +356,9 @@ function asSnapshot(value: unknown): PublishedSnapshot | null {
         })),
     rescuedHorses: saved.rescuedHorses ?? saved.boardingHorses,
     soldHorses: saved.soldHorses ?? 0,
-    horseDefaults: saved.horseDefaults ?? { rescued: saved.boardingHorses, sold: 0 },
+    horseDefaults: { rescued: saved.horseDefaults?.rescued ?? saved.boardingHorses, sold: saved.horseDefaults?.sold ?? 0, added: saved.horseDefaults?.added ?? 0 },
+    // 手入力の収入の項目を足す前に公開した分。「その他」は、当時のシステム計算の額。
+    extraIncome: saved.extraIncome ?? { youtubeYen: 0, transferYen: 0, otherYen: saved.otherIncomeYen ?? 0 },
     system: saved.system ?? {
       donationCard: saved.donations.card,
       donationBank: saved.donations.bank,
@@ -372,6 +375,11 @@ function asSnapshot(value: unknown): PublishedSnapshot | null {
       shareSupporters: saved.counts.shareSupporters,
       shareUnits: saved.counts.shareUnits,
     },
+    // 金額と出どころを持たない古い形のものは、無いものとして扱う。
+    stripeSupport: saved.stripeSupport && typeof saved.stripeSupport.yen === "number" ? saved.stripeSupport : null,
+    // 管理馬の表示を足す前に公開した分。0頭のとき、画面は「—」を出す。
+    managedHorses: saved.managedHorses ?? 0,
+    supportPerHorseYen: saved.supportPerHorseYen ?? 0,
   };
   return { report, expenses: parseExpenses(snap.expenses), note: snap.note ?? "" };
 }
@@ -480,6 +488,24 @@ export async function loadCountHistory(admin: Admin): Promise<{ history: TrendMo
   ]);
   if (sourceResult.error) return { history: [], error: sourceResult.error };
   return { history: buildCountHistory({ ...sourceResult.source, liveSupport }, SYSTEM_START_YM, ym), error: null };
+}
+
+/**
+ * サイトの登録（支援管理と同じ、状態が「有効」の支援）と、Stripe で支払い中の定期課金を、支援者ごとに照合する。
+ * 経営管理の当月の画面に、合わない方の一覧を出すのに使う。Stripe を読めないときは null。
+ */
+export async function loadSupportReconciliation(admin: Admin): Promise<SupportReconciliation | null> {
+  const [detail, site, customers] = await Promise.all([
+    loadLiveSupportDetail().catch(() => null),
+    fetchAllRows<SiteSupportRow>((from, to) =>
+      admin.from("support_subscriptions").select("customer_id, units").eq("status", "active").order("id").range(from, to),
+    ),
+    fetchAllRows<ReconcileCustomer>((from, to) =>
+      admin.from("customers").select("id, full_name, email, stripe_customer_id").order("id").range(from, to),
+    ),
+  ]);
+  if (!detail || site.error || customers.error) return null;
+  return reconcileSupport(site.rows, detail.payers, customers.rows);
 }
 
 export async function listPublishedReports(): Promise<{ rows: { year_month: string; published_at: string }[]; tableMissing: boolean }> {

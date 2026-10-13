@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requireCapability } from "@/lib/auth";
-import { buildGivingInsight } from "@/lib/donationInsight";
+import { loadCustomerNames, type CustomerNames } from "@/lib/customerNames";
+import { buildGivingInsight, moverCustomerIds } from "@/lib/donationInsight";
 import { formatYen } from "@/lib/format";
 import { SYSTEM_START_YM, currentYearMonth, formatYearMonth, monthLabel, parseYearMonth, shiftMonth } from "@/lib/monthlyReport";
 import { loadReportSource } from "@/lib/monthlyReportData";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import MoverList from "@/components/admin/MoverList";
 import SignalList from "@/components/admin/SignalList";
 
 export const dynamic = "force-dynamic";
@@ -23,11 +25,14 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
   const current = currentYearMonth();
   const requested = parseYearMonth(searchParams.ym ?? "") ? searchParams.ym! : current;
   const ym = requested > current ? current : requested < SYSTEM_START_YM ? SYSTEM_START_YM : requested;
-  const loaded = await loadReportSource(createSupabaseAdminClient(), ym).catch((error: unknown) => ({
+  const admin = createSupabaseAdminClient();
+  const loaded = await loadReportSource(admin, ym).catch((error: unknown) => ({
     source: null,
     error: error instanceof Error ? error.message : "集計を読み込めませんでした。",
   }));
   const insight = loaded.source ? buildGivingInsight(loaded.source, ym) : null;
+  // 口数を増やした人・減らした人の名前。読み込めなくても、数字はそのまま出す。
+  const names: CustomerNames = insight ? await loadCustomerNames(admin, moverCustomerIds(insight)).catch(() => ({})) : {};
   const maxSlice = Math.max(1, ...(insight?.slices.map((slice) => Math.max(slice.current, slice.previous)) ?? [1]));
   const incomeTotal = insight?.slices.reduce((sum, slice) => sum + slice.current, 0) ?? 0;
   const dropped = insight?.slices.filter((slice) => slice.delta < 0).sort((a, b) => a.delta - b.delta)[0];
@@ -38,7 +43,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">寄付状況</h1>
+          <h1 className="text-2xl font-bold">支援状況</h1>
           <p className="mt-1 text-sm text-ink-soft">経営管理の収入が動いたとき、定期の会費・一口支援・単発寄付・馬ごとの月額のどれが動いたかを見ます。</p>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -57,7 +62,7 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
       ) : null}
       {insight ? (
         <>
-          <SignalList signals={insight.signals} bright={insight.bright} />
+          <SignalList signals={insight.signals} bright={insight.bright} names={names} />
           <section className="card">
             <h2 className="section-title">{monthLabel(ym)}は先月より {insight.incomeDelta < 0 ? "" : "+"}{formatYen(insight.incomeDelta)}</h2>
             <p className="text-sm text-ink-soft">
@@ -98,9 +103,12 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
               {horsesDown.length === 0 ? <p className="text-sm text-ink-soft">減った馬はありません。</p> : (
                 <ul className="space-y-2 text-sm">
                   {horsesDown.map((horse) => (
-                    <li key={horse.id} className="flex justify-between gap-3">
-                      <span>{horse.name}</span>
-                      <span className="tabular-nums text-rose-700">{formatYen(horse.deltaYen)}（{horse.currentUnits}口）</span>
+                    <li key={horse.id}>
+                      <div className="flex justify-between gap-3">
+                        <span>{horse.name}</span>
+                        <span className="tabular-nums text-rose-700">{formatYen(horse.deltaYen)}（{horse.currentUnits}口）</span>
+                      </div>
+                      <MoverList movers={horse.people.filter((mover) => mover.deltaUnits < 0)} names={names} limit={10} className="mt-1 pl-3" />
                     </li>
                   ))}
                 </ul>
@@ -111,9 +119,12 @@ export default async function GivingReportPage({ searchParams }: { searchParams:
               {horsesUp.length === 0 ? <p className="text-sm text-ink-soft">増えた馬はありません。</p> : (
                 <ul className="space-y-2 text-sm">
                   {horsesUp.map((horse) => (
-                    <li key={horse.id} className="flex justify-between gap-3">
-                      <span>{horse.name}</span>
-                      <span className="tabular-nums text-emerald-700">+{formatYen(horse.deltaYen)}（{horse.currentUnits}口）</span>
+                    <li key={horse.id}>
+                      <div className="flex justify-between gap-3">
+                        <span>{horse.name}</span>
+                        <span className="tabular-nums text-emerald-700">+{formatYen(horse.deltaYen)}（{horse.currentUnits}口）</span>
+                      </div>
+                      <MoverList movers={horse.people.filter((mover) => mover.deltaUnits > 0)} names={names} limit={10} className="mt-1 pl-3" />
                     </li>
                   ))}
                 </ul>
